@@ -20,11 +20,14 @@ import {
 } from './types/index';
 
 export interface SonarProcessingParams {
-  frequencyKhz: number;
-  altitudeMeters: number;
-  contrastBoost: number;
-  shadowThreshold: number;
-  filterMode: 'Standard' | 'High-Pass' | 'Adaptive-Gain' | 'Acoustic-Shadow-Only';
+  frequencyKhz?: number;
+  altitudeMeters?: number;
+  contrastBoost?: number;
+  contrastFactor?: number;
+  confidenceThreshold?: number;
+  noiseReduction?: boolean;
+  shadowThreshold?: number;
+  filterMode?: 'Standard' | 'High-Pass' | 'Adaptive-Gain' | 'Acoustic-Shadow-Only';
 }
 
 export type SystemAlert = AlertRecord & {

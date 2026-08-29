@@ -37,6 +37,7 @@ export interface BoundingBox {
   height: number;
   label?: string;
   confidence?: number;
+  category?: string;
 }
 
 export interface DetectionRecord {

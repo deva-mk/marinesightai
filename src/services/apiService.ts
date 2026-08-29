@@ -120,4 +120,47 @@ export const apiService = {
     if (!res.ok) throw new Error(`Report Generator API error: ${res.statusText}`);
     return await res.json();
   },
+
+  // Hydrodynamic Drift Prediction
+  predictDrift: async (payload: {
+    origin: [number, number];
+    debrisCategory?: string;
+    windSpeedKmh?: number;
+    windDirectionDeg?: number;
+    currentSpeedKnots?: number;
+    currentDirectionDeg?: number;
+    waveHeightM?: number;
+    simulationHours?: number;
+  }) => {
+    const res = await fetch('/api/drift/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Drift API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Fleet Telemetry
+  getFleetVessels: async () => {
+    const res = await fetch('/api/fleet/vessels');
+    if (!res.ok) throw new Error(`Fleet API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Fleet Dispatch
+  dispatchVessel: async (payload: {
+    incidentId: string;
+    vesselId: string;
+    assignedLead?: string;
+    priority?: string;
+  }) => {
+    const res = await fetch('/api/fleet/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Dispatch API error: ${res.statusText}`);
+    return await res.json();
+  },
 };
