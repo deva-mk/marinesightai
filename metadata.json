@@ -1,0 +1,12 @@
+{
+  "name": "MarineSight AI - Marine Intelligence",
+  "description": "AI-Powered Marine Debris & Underwater Anomaly Intelligence Platform combining side-scan sonar, surface computer vision, drone tracking, and multimodal fusion.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+
