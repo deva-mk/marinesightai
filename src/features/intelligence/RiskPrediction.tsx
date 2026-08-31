@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   TrendingUp, 
   ShieldAlert, 
@@ -7,23 +7,28 @@ import {
   Compass, 
   Layers, 
   Sparkles, 
-  ArrowRight,
-  AlertTriangle,
-  Info,
-  CheckCircle2,
-  RefreshCw,
-  Play,
-  Pause,
-  MapPin,
-  Clock,
-  Gauge
+  ArrowRight, 
+  AlertTriangle, 
+  Info, 
+  CheckCircle2, 
+  RefreshCw, 
+  Play, 
+  Pause, 
+  MapPin, 
+  Clock, 
+  Gauge,
+  Sliders,
+  Target
 } from 'lucide-react';
-import { RiskAssessment } from '../../types';
+import { DetectionRecord, IncidentRecord } from '../../types';
+import { marineStorage } from '../../services/storage';
 import { apiService } from '../../services/apiService';
 
-export const RiskPrediction: React.FC = () => {
+export const RiskPrediction: React.FC<{ onNavigate?: (view: string, id?: string) => void }> = ({ onNavigate }) => {
+  const [selectedIncidentOrDetId, setSelectedIncidentOrDetId] = useState<string>('DEFAULT');
   const [selectedArea, setSelectedArea] = useState('Sector 4B - Palk Bay Coral Shoal');
   const [debrisCategory, setDebrisCategory] = useState('Ghost Fishing Gear');
+  const [coordinates, setCoordinates] = useState<[number, number]>([9.3148, 79.1828]);
   const [debrisHistoryCount, setDebrisHistoryCount] = useState<number>(18);
   const [currentSpeedKnots, setCurrentSpeedKnots] = useState<number>(1.8);
   const [windSpeedKmh, setWindSpeedKmh] = useState<number>(22);
@@ -32,6 +37,56 @@ export const RiskPrediction: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
   const [isCalculating, setIsCalculating] = useState<boolean>(false);
+
+  const [availableTargets, setAvailableTargets] = useState<{ id: string; title: string; category: string; coords: [number, number]; area: string }[]>([]);
+
+  useEffect(() => {
+    const incs = marineStorage.getIncidents();
+    const dets = marineStorage.getDetections();
+
+    const targets: { id: string; title: string; category: string; coords: [number, number]; area: string }[] = [];
+
+    incs.forEach(inc => {
+      targets.push({
+        id: inc.id,
+        title: `[Incident] ${inc.title}`,
+        category: inc.category,
+        coords: [inc.location.lat, inc.location.lng],
+        area: `${inc.location.sector} (${inc.location.areaName || 'Marine Zone'})`
+      });
+    });
+
+    dets.forEach(d => {
+      targets.push({
+        id: d.id,
+        title: `[Detection] ${d.title} (${d.source})`,
+        category: d.category,
+        coords: [d.location.lat, d.location.lng],
+        area: `${d.location.sector} (${d.location.areaName || 'Sector'})`
+      });
+    });
+
+    setAvailableTargets(targets);
+  }, []);
+
+  const handleTargetChange = (targetId: string) => {
+    setSelectedIncidentOrDetId(targetId);
+    if (targetId === 'DEFAULT') {
+      setSelectedArea('Sector 4B - Palk Bay Coral Shoal');
+      setCoordinates([9.3148, 79.1828]);
+      setDebrisCategory('Ghost Fishing Gear');
+      setDebrisHistoryCount(18);
+      return;
+    }
+
+    const found = availableTargets.find(t => t.id === targetId);
+    if (found) {
+      setSelectedArea(found.area);
+      setCoordinates(found.coords);
+      setDebrisCategory(found.category);
+      setDebrisHistoryCount(Math.floor(12 + Math.random() * 15));
+    }
+  };
 
   const [riskData, setRiskData] = useState<any>({
     riskScore: 92,
@@ -79,7 +134,7 @@ export const RiskPrediction: React.FC = () => {
     setIsCalculating(true);
     try {
       const riskRes = await apiService.predictRisk({
-        coordinates: [9.3148, 79.1828],
+        coordinates,
         debrisHistoryCount,
         primaryCategory: debrisCategory
       });
@@ -88,7 +143,7 @@ export const RiskPrediction: React.FC = () => {
       }
 
       const driftRes = await apiService.predictDrift({
-        origin: [9.3148, 79.1828],
+        origin: coordinates,
         debrisCategory,
         windSpeedKmh,
         currentSpeedKnots,
@@ -107,7 +162,7 @@ export const RiskPrediction: React.FC = () => {
 
   useEffect(() => {
     fetchRiskAndDrift();
-  }, [debrisCategory, debrisHistoryCount, currentSpeedKnots, windSpeedKmh, waveHeightM, simulationHours]);
+  }, [coordinates, debrisCategory, debrisHistoryCount, currentSpeedKnots, windSpeedKmh, waveHeightM, simulationHours]);
 
   // Drift simulation playback loop
   useEffect(() => {
@@ -145,11 +200,49 @@ export const RiskPrediction: React.FC = () => {
         <button
           onClick={fetchRiskAndDrift}
           disabled={isCalculating}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2A2A2A] hover:bg-black text-white text-xs font-bold transition-all shadow-xs"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2A2A2A] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isCalculating ? 'animate-spin' : ''}`} />
           <span>Re-Simulate Ocean Models</span>
         </button>
+      </div>
+
+      {/* Target Origin Seed Selector Bar */}
+      <div className="bg-white p-5 rounded-3xl border border-[#E8E1D5] shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-red-600" />
+            <h3 className="text-xs font-extrabold uppercase text-[#2A2A2A] tracking-wider">
+              Ingest Live Target / Incident Seed
+            </h3>
+          </div>
+          <span className="text-[11px] text-[#736B5E]">
+            Origin Coords: <strong className="font-mono text-[#2A2A2A]">{coordinates[0].toFixed(4)}°N, {coordinates[1].toFixed(4)}°E</strong>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div className="md:col-span-2">
+            <select
+              value={selectedIncidentOrDetId}
+              onChange={(e) => handleTargetChange(e.target.value)}
+              className="w-full p-2.5 bg-[#F9F6F0] border border-[#DDD5C7] rounded-xl font-bold text-[#2A2A2A] focus:outline-none"
+            >
+              <option value="DEFAULT">Default Benchmark • Palk Bay Coral Shoal (9.3148°N, 79.1828°E)</option>
+              {availableTargets.map(t => (
+                <option key={t.id} value={t.id}>
+                  {t.title} - {t.area}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-end">
+            <span className="px-3 py-2 rounded-xl bg-[#F2EDE4] text-[#5C5449] font-bold text-xs border border-[#DDD5C7]">
+              Simulation Physics: <span className="text-[#4F6F52]">ACTIVE (Eulerian-Lagrangian)</span>
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Hero Score Gauge */}
@@ -279,7 +372,7 @@ export const RiskPrediction: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsPlaying(!isPlaying)}
-              className="px-3 py-1.5 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+              className="px-3 py-1.5 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
               {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
               <span>{isPlaying ? 'Pause Simulation' : 'Play Trajectory'}</span>
@@ -296,7 +389,7 @@ export const RiskPrediction: React.FC = () => {
             <button
               key={idx}
               onClick={() => setActiveStepIndex(idx)}
-              className={`p-3 rounded-2xl border text-left transition-all ${
+              className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                 activeStepIndex === idx
                   ? 'border-[#FF6F59] bg-[#FF6F59]/20 text-white ring-1 ring-[#FF6F59]'
                   : 'border-[#2D3934] bg-[#141A17] text-gray-300 hover:border-gray-500'
@@ -390,3 +483,4 @@ export const RiskPrediction: React.FC = () => {
     </div>
   );
 };
+

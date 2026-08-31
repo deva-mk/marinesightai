@@ -20,7 +20,9 @@ import {
   Settings,
   X,
   Sparkles,
-  Waves
+  Waves,
+  Key,
+  ShieldCheck
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -128,8 +130,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'ADMINISTRATION',
+      title: 'ADMINISTRATION & SESSIONS',
       items: [
+        { id: 'auth', label: 'Login & Sessions', icon: Key, badge: 'RBAC', badgeColor: 'bg-[#FF6F59] text-white' },
         { id: 'users', label: 'Team & Roles', icon: Users, allowedRoles: ['ADMIN'] },
         { id: 'settings', label: 'System Settings', icon: Settings }
       ]

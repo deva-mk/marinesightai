@@ -282,9 +282,23 @@ export const Header: React.FC<HeaderProps> = ({
                   ))}
                 </div>
 
-                <div className="px-3 pt-2 border-t border-[#F2EDE4]">
+                <div className="px-3 pt-2 border-t border-[#F2EDE4] space-y-1">
                   <button
-                    onClick={() => setActiveView('settings')}
+                    onClick={() => setActiveView?.('auth')}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#FF6F59] hover:bg-[#FF6F59]/10 transition-colors flex items-center justify-between"
+                  >
+                    <span>Login & Session Hub</span>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setActiveView?.('models')}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#5C5449] hover:bg-[#F2EDE4] transition-colors flex items-center justify-between"
+                  >
+                    <span>YOLO Training Studio</span>
+                    <Sparkles className="w-3.5 h-3.5 text-[#FF6F59]" />
+                  </button>
+                  <button
+                    onClick={() => setActiveView?.('settings')}
                     className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#5C5449] hover:bg-[#F2EDE4] transition-colors"
                   >
                     System Profile & Keys

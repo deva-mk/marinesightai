@@ -27,6 +27,7 @@ import { MarineAnalytics } from './features/analytics/MarineAnalytics';
 import { ReportsCenter } from './features/reports/ReportsCenter';
 import { UserManagement } from './features/admin/UserManagement';
 import { SystemSettings } from './features/admin/SystemSettings';
+import { AuthPage } from './features/auth/AuthPage';
 
 // State Service
 import { marineStorage } from './services/storage';
@@ -219,7 +220,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'models' && (
-              <ModelRegistry />
+              <ModelRegistry onNavigate={handleNavigate} />
             )}
 
             {activeTab === 'datasets' && (
@@ -239,6 +240,10 @@ export const App: React.FC = () => {
                 incidents={incidents}
                 missions={missions}
               />
+            )}
+
+            {(activeTab === 'auth' || activeTab === 'login') && (
+              <AuthPage onNavigate={handleNavigate} />
             )}
 
             {activeTab === 'users' && (

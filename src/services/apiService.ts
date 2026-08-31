@@ -33,7 +33,11 @@ export const apiService = {
   processSurface: async (payload: {
     filename: string;
     source?: string;
+    modelId?: string;
     confidenceThreshold?: number;
+    iouThreshold?: number;
+    imageData?: string;
+    coordinates?: [number, number];
   }) => {
     const res = await fetch('/api/detection/surface', {
       method: 'POST',
@@ -161,6 +165,52 @@ export const apiService = {
       body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error(`Dispatch API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // YOLO Model Training
+  trainYoloModel: async (payload: {
+    architecture?: string;
+    datasetId?: string;
+    datasetName?: string;
+    epochs?: number;
+    batchSize?: number;
+    learningRate?: number;
+    imageSize?: number;
+    optimizer?: string;
+    augmentations?: string[];
+  }) => {
+    const res = await fetch('/api/model/train', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Model Training API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Deploy YOLO Model
+  deployYoloModel: async (payload: {
+    runId?: string;
+    modelName?: string;
+    map50?: number;
+    precision?: number;
+    recall?: number;
+    latencyMs?: number;
+  }) => {
+    const res = await fetch('/api/model/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Model Deploy API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Get Model Status
+  getYoloStatus: async () => {
+    const res = await fetch('/api/model/status');
+    if (!res.ok) throw new Error(`Model Status API error: ${res.statusText}`);
     return await res.json();
   },
 };
