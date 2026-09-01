@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
   User, 
@@ -22,190 +22,178 @@ import {
   Cpu, 
   Ship, 
   RefreshCw, 
-  AlertCircle
+  AlertCircle,
+  Building,
+  Phone,
+  Users,
+  UserPlus,
+  LogIn,
+  KeyRound
 } from 'lucide-react';
-import { DEMO_USERS } from '../../data/sampleData';
 import { UserProfile, UserRole } from '../../types';
-import { marineStorage } from '../../services/storage';
+import { marineStorage, DEFAULT_ACCOUNTS } from '../../services/storage';
 
 interface AuthPageProps {
   onNavigate: (view: string, id?: string) => void;
 }
 
-// Predefined demo credentials with clear passwords and capabilities
-export const PREDEFINED_ACCOUNTS = [
-  {
-    ...DEMO_USERS[0],
-    password: 'admin123',
-    clearanceLevel: 'Level 5 (Super Administrator)',
-    capabilities: [
-      'Full System Administration & Role RBAC',
-      'YOLO Neural Architecture Training & Deployment',
-      'Threshold Configuration & API Key Setup',
-      'Incident Command & Maritime Vessel Dispatch',
-    ],
-    badgeColor: 'bg-[#FF6F59]/10 text-[#FF6F59] border-[#FF6F59]/20',
-  },
-  {
-    ...DEMO_USERS[1],
-    password: 'operator123',
-    clearanceLevel: 'Level 4 (Field Fleet Commander)',
-    capabilities: [
-      'Side-Scan Sonar Telemetry Parsing (.DAT, .XTF)',
-      'Drone Aerial Patrol Ingestion & Real-Time Stream',
-      'Multimodal Fusion Co-Registration & Hotspot Logs',
-      'Emergency Marine Salvage Unit Dispatch',
-    ],
-    badgeColor: 'bg-[#4F6F52]/10 text-[#4F6F52] border-[#4F6F52]/20',
-  },
-  {
-    ...DEMO_USERS[2],
-    password: 'researcher123',
-    clearanceLevel: 'Level 3 (Marine Scientific Analyst)',
-    capabilities: [
-      'Acoustic Spectral Anomaly Analysis',
-      'Lagrangian Hydrodynamic Drift Forecasting',
-      'Dataset Lab Annotation Export (COCO/VOC/YOLO)',
-      'Ecological Impact & MPA Risk Assessment',
-    ],
-    badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
-  },
-  {
-    ...DEMO_USERS[3],
-    password: 'cleanup123',
-    clearanceLevel: 'Level 3 (Response Squad Lead)',
-    capabilities: [
-      'Field Cleanup Mission Management & Logs',
-      'Before / After Debris Recovery Verification',
-      'Tonnage & High-Risk Tangle Removal Records',
-      'Vessel Fuel & Hydraulic Winch Status Tracking',
-    ],
-    badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  },
-  {
-    ...DEMO_USERS[4],
-    password: 'viewer123',
-    clearanceLevel: 'Level 1 (Public Observer)',
-    capabilities: [
-      'Read-Only Marine Overview Dashboard',
-      'Public Hotspot Map & Pollution Density View',
-      'Detection Timeline Inspection',
-      'Standard Summary Reports Browsing',
-    ],
-    badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
-  },
-];
-
 export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile>(marineStorage.getCurrentUser());
-  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(marineStorage.isLoggedIn());
+  const [mode, setMode] = useState<'LOGIN' | 'REGISTER' | 'USERS'>('LOGIN');
+  
+  // Form fields
   const [emailInput, setEmailInput] = useState<string>('admin@marinesight.ai');
   const [passwordInput, setPasswordInput] = useState<string>('admin123');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState<string>('');
   const [nameInput, setNameInput] = useState<string>('');
+  const [orgInput, setOrgInput] = useState<string>('MarineSight AI Coastal Fleet');
+  const [phoneInput, setPhoneInput] = useState<string>('+91 94420 18832');
   const [roleInput, setRoleInput] = useState<UserRole>('ADMIN');
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
   const [logoutModalOpen, setLogoutModalOpen] = useState<boolean>(false);
+  const [registeredUsers, setRegisteredUsers] = useState<UserProfile[]>(marineStorage.getRegisteredUsers());
+
+  // Keep state synchronized with storage
+  useEffect(() => {
+    const unsubscribe = marineStorage.subscribe(() => {
+      setCurrentUser(marineStorage.getCurrentUser());
+      setIsLoggedIn(marineStorage.isLoggedIn());
+      setRegisteredUsers(marineStorage.getRegisteredUsers());
+    });
+    return unsubscribe;
+  }, []);
 
   const showNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  const handleInstantSignIn = (account: typeof PREDEFINED_ACCOUNTS[0]) => {
-    marineStorage.setCurrentUser({
-      id: account.id,
-      name: account.name,
-      email: account.email,
-      role: account.role,
-      organization: account.organization,
-      avatarUrl: account.avatarUrl,
-    });
-    setCurrentUser(marineStorage.getCurrentUser());
-    setEmailInput(account.email);
-    setPasswordInput(account.password);
-    showNotification(`Signed in as ${account.name} (${account.role})! Operational clearance active.`, 'success');
+  const handleInstantSignIn = (account: typeof DEFAULT_ACCOUNTS[0]) => {
+    const res = marineStorage.login(account.email, account.password || 'admin123');
+    if (res.success && res.user) {
+      setCurrentUser(res.user);
+      setIsLoggedIn(true);
+      setEmailInput(account.email);
+      setPasswordInput(account.password || 'admin123');
+      showNotification(`Signed in as ${res.user.name} (${res.user.role})! Operational clearance active.`, 'success');
+    } else {
+      showNotification(res.message, 'error');
+    }
   };
 
-  const handleAutofillCredentials = (account: typeof PREDEFINED_ACCOUNTS[0]) => {
+  const handleAutofillCredentials = (account: typeof DEFAULT_ACCOUNTS[0]) => {
     setEmailInput(account.email);
-    setPasswordInput(account.password);
+    setPasswordInput(account.password || 'admin123');
     setRoleInput(account.role);
+    setMode('LOGIN');
     showNotification(`Filled predefined credentials for ${account.name} (${account.email})`, 'info');
   };
 
-  const handleCopyCredentials = (account: typeof PREDEFINED_ACCOUNTS[0]) => {
+  const handleCopyCredentials = (account: typeof DEFAULT_ACCOUNTS[0]) => {
     navigator.clipboard.writeText(`Email: ${account.email}\nPassword: ${account.password}`);
     setCopiedAccount(account.id);
     setTimeout(() => setCopiedAccount(null), 2500);
     showNotification(`Copied credentials for ${account.name} to clipboard`, 'info');
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleLoginFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!emailInput.trim()) {
       showNotification('Please enter a valid email address.', 'error');
       return;
     }
 
-    const matchedPredefined = PREDEFINED_ACCOUNTS.find(
-      (a) => a.email.toLowerCase() === emailInput.trim().toLowerCase()
-    );
-
-    if (matchedPredefined) {
-      marineStorage.setCurrentUser({
-        id: matchedPredefined.id,
-        name: matchedPredefined.name,
-        email: matchedPredefined.email,
-        role: matchedPredefined.role,
-        organization: matchedPredefined.organization,
-        avatarUrl: matchedPredefined.avatarUrl,
-      });
-      setCurrentUser(marineStorage.getCurrentUser());
-      showNotification(`Authenticated successfully as ${matchedPredefined.name}!`, 'success');
+    const res = marineStorage.login(emailInput.trim(), passwordInput);
+    if (res.success && res.user) {
+      setCurrentUser(res.user);
+      setIsLoggedIn(true);
+      showNotification(`Welcome back, ${res.user.name}! Authenticated as ${res.user.role}.`, 'success');
     } else {
-      const newUser: UserProfile = {
-        id: `usr-${Date.now().toString().slice(-4)}`,
-        name: nameInput.trim() || emailInput.split('@')[0] || 'Marine Specialist',
-        email: emailInput.trim(),
-        role: roleInput,
-        organization: 'MarineSight AI Maritime Observatories',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      };
-      marineStorage.setCurrentUser(newUser);
-      setCurrentUser(marineStorage.getCurrentUser());
-      showNotification(`Account created & logged in as ${newUser.name} (${newUser.role})!`, 'success');
+      showNotification(res.message, 'error');
+    }
+  };
+
+  const handleRegisterFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nameInput.trim()) {
+      showNotification('Please enter your full name.', 'error');
+      return;
+    }
+    if (!emailInput.trim()) {
+      showNotification('Please enter a valid email address.', 'error');
+      return;
+    }
+    if (!passwordInput || passwordInput.length < 4) {
+      showNotification('Password must be at least 4 characters long.', 'error');
+      return;
+    }
+    if (confirmPasswordInput && passwordInput !== confirmPasswordInput) {
+      showNotification('Passwords do not match. Please verify.', 'error');
+      return;
+    }
+
+    const res = marineStorage.register({
+      name: nameInput.trim(),
+      email: emailInput.trim(),
+      password: passwordInput,
+      role: roleInput,
+      organization: orgInput.trim() || 'Marine Coastal Surveillance Unit',
+      phone: phoneInput.trim()
+    });
+
+    if (res.success && res.user) {
+      setCurrentUser(res.user);
+      setIsLoggedIn(true);
+      setRegisteredUsers(marineStorage.getRegisteredUsers());
+      showNotification(`Account created successfully! Welcome, ${res.user.name}.`, 'success');
+    } else {
+      showNotification(res.message, 'error');
     }
   };
 
   const handleLogout = () => {
-    // Switch to Guest / Viewer profile
-    const guestUser = PREDEFINED_ACCOUNTS[4];
-    marineStorage.setCurrentUser({
-      id: guestUser.id,
-      name: guestUser.name,
-      email: guestUser.email,
-      role: guestUser.role,
-      organization: guestUser.organization,
-      avatarUrl: guestUser.avatarUrl,
-    });
+    marineStorage.logout();
     setCurrentUser(marineStorage.getCurrentUser());
-    setEmailInput(PREDEFINED_ACCOUNTS[0].email);
-    setPasswordInput(PREDEFINED_ACCOUNTS[0].password);
+    setIsLoggedIn(false);
+    setEmailInput(DEFAULT_ACCOUNTS[0].email);
+    setPasswordInput(DEFAULT_ACCOUNTS[0].password || 'admin123');
     setLogoutModalOpen(false);
     showNotification('You have logged out of your active session. Operating in Guest Viewer mode.', 'info');
   };
 
-  const currentPredefined = PREDEFINED_ACCOUNTS.find((a) => a.email === currentUser.email) || {
+  const getRoleBadgeStyle = (role: UserRole) => {
+    switch (role) {
+      case 'ADMIN': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'MARINE_OPERATOR': return 'bg-amber-100 text-amber-800 border-amber-200';
+      case 'RESEARCHER': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'CLEANUP_TEAM': return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      default: return 'bg-stone-100 text-stone-700 border-stone-200';
+    }
+  };
+
+  const getRoleCapabilities = (role: UserRole): string[] => {
+    switch (role) {
+      case 'ADMIN':
+        return ['Full System Access & User Accounts', 'Deploy & Retrain AI Models', 'Modify Global Security Policies'];
+      case 'MARINE_OPERATOR':
+        return ['Upload Sonar & Aerial Feeds', 'Dispatch Drone Missions', 'Trigger Emergency Response'];
+      case 'RESEARCHER':
+        return ['Access Raw Marine Datasets', 'Export Multi-modal Analytics', 'Run Environmental Trend Queries'];
+      case 'CLEANUP_TEAM':
+        return ['Execute Field Recovery Missions', 'Update Debris Retrieval Logs', 'Track Vessel Deployment'];
+      default:
+        return ['Public Read-Only Feeds', 'View Live Threat Dashboard', 'Basic Marine Statistics'];
+    }
+  };
+
+  const currentPredefined = DEFAULT_ACCOUNTS.find((a) => a.email.toLowerCase() === currentUser.email.toLowerCase()) || {
     ...currentUser,
     password: '••••••••',
-    clearanceLevel: `Level 2 (${currentUser.role})`,
-    capabilities: [
-      'Marine Intelligence Dashboard Access',
-      'Real-Time Anomaly Monitoring',
-      'Telemetry Review & Incident Reports',
-    ],
+    clearance: `Level 2 (${currentUser.role})`,
     badgeColor: 'bg-[#FF6F59]/10 text-[#FF6F59] border-[#FF6F59]/20',
   };
 
@@ -237,15 +225,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FF6F59]/10 text-[#FF6F59] border border-[#FF6F59]/20 uppercase">
-              Authentication Portal
+              Account & Authentication Portal
             </span>
             <span className="text-xs text-[#736B5E]">Role-Based Access Control (RBAC) & Sessions</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2A2A2A] tracking-tight">
-            MarineSight AI Access & Authentication Hub
+            MarineSight AI Account & Session Hub
           </h1>
           <p className="text-xs sm:text-sm text-[#736B5E] max-w-2xl">
-            Sign in with predefined role accounts or custom credentials to operate sonar intelligence, drone missions, hydrodynamic drift modeling, and YOLO neural networks.
+            Manage your account credentials, sign in or register new personnel, or switch seamlessly between predefined operator roles.
           </p>
         </div>
 
@@ -257,13 +245,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
             <Compass className="w-4 h-4 text-[#FF6F59]" />
             <span>Go to Dashboard</span>
           </button>
-          <button
-            onClick={() => setLogoutModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-white border border-[#E3DBD0] hover:border-rose-300 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Log Out</span>
-          </button>
+          {isLoggedIn ? (
+            <button
+              onClick={() => setLogoutModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-white border border-[#E3DBD0] hover:border-rose-300 hover:bg-rose-50 text-rose-600 text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Log Out</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setMode('LOGIN')}
+              className="px-4 py-2.5 rounded-xl bg-[#FF6F59] text-white text-xs font-bold transition-all flex items-center gap-2 shadow-xs"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Sign In</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -279,18 +277,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-extrabold text-[#2A2A2A]">{currentUser.name}</h3>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase ${currentPredefined.badgeColor}`}>
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase ${currentPredefined.badgeColor || 'bg-[#FF6F59]/10 text-[#FF6F59]'}`}>
                   {currentUser.role}
                 </span>
-                <span className="flex items-center gap-1 text-[11px] font-bold text-[#4F6F52] bg-[#4F6F52]/10 px-2 py-0.5 rounded-full">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Authenticated & Active
+                <span className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  isLoggedIn ? 'text-[#4F6F52] bg-[#4F6F52]/10' : 'text-amber-700 bg-amber-100'
+                }`}>
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {isLoggedIn ? 'Authenticated & Active' : 'Guest Mode (Public)'}
                 </span>
               </div>
               <p className="text-xs text-[#736B5E] font-medium">
                 {currentUser.email} • <span className="text-[#2A2A2A]">{currentUser.organization}</span>
               </p>
               <p className="text-[11px] text-[#8C8275]">
-                Clearance: <strong className="text-[#2A2A2A]">{currentPredefined.clearanceLevel}</strong> • Session Token: <span className="font-mono text-[#5C5449]">MS-AUTH-{currentUser.id.toUpperCase()}-2026</span>
+                Clearance: <strong className="text-[#2A2A2A]">{currentPredefined.clearanceLevel || `Level 2 (${currentUser.role})`}</strong> • Session Token: <span className="font-mono text-[#5C5449]">{currentUser.token || `MS-AUTH-${currentUser.id.toUpperCase()}-2026`}</span>
               </p>
             </div>
           </div>
@@ -301,7 +301,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
               className="px-3.5 py-2 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm shadow-[#FF6F59]/30"
             >
               <Cpu className="w-3.5 h-3.5" />
-              <span>YOLO Training Studio</span>
+              <span>YOLO Studio</span>
             </button>
             <button
               onClick={() => onNavigate('sonar')}
@@ -310,13 +310,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
               <Radio className="w-3.5 h-3.5" />
               <span>Sonar Console</span>
             </button>
-            <button
-              onClick={() => setLogoutModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1.5"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>End Session</span>
-            </button>
+            {isLoggedIn && (
+              <button
+                onClick={() => setLogoutModalOpen(true)}
+                className="px-3.5 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold transition-colors flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -341,8 +343,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {PREDEFINED_ACCOUNTS.map((account) => {
-            const isCurrentlyActive = currentUser.email === account.email;
+          {DEFAULT_ACCOUNTS.map((account) => {
+            const isCurrentlyActive = currentUser.email.toLowerCase() === account.email.toLowerCase() && isLoggedIn;
             const isCopied = copiedAccount === account.id;
 
             return (
@@ -357,7 +359,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
                 <div className="space-y-3">
                   {/* Card Header */}
                   <div className="flex items-center justify-between">
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${account.badgeColor}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${getRoleBadgeStyle(account.role)}`}>
                       {account.role}
                     </span>
                     {isCurrentlyActive && (
@@ -403,7 +405,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
                       Granted Permissions:
                     </span>
                     <ul className="space-y-1">
-                      {account.capabilities.slice(0, 3).map((cap, cIdx) => (
+                      {getRoleCapabilities(account.role).slice(0, 3).map((cap, cIdx) => (
                         <li key={cIdx} className="text-[11px] text-[#5C5449] flex items-start gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52] shrink-0 mt-0.5" />
                           <span>{cap}</span>
@@ -452,21 +454,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
       {/* Section 2: Interactive Sign In / Register Form & Security Policies */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Sign In Form */}
+        {/* Form Container */}
         <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E1D5] shadow-xs space-y-6">
-          <div className="flex items-center justify-between border-b border-[#F2EDE4] pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#F2EDE4] pb-4 gap-3">
             <div>
               <h3 className="text-lg font-extrabold text-[#2A2A2A]">
-                {mode === 'LOGIN' ? 'Sign In to Maritime Console' : 'Register New Personnel Profile'}
+                {mode === 'LOGIN' && 'Sign In to Maritime Console'}
+                {mode === 'REGISTER' && 'Register New Personnel Profile'}
+                {mode === 'USERS' && 'Registered Users Directory'}
               </h3>
               <p className="text-xs text-[#736B5E] mt-0.5">
-                {mode === 'LOGIN' 
-                  ? 'Enter predefined credentials or custom credentials to authenticate.'
-                  : 'Create a new operator account for field mission logs.'}
+                {mode === 'LOGIN' && 'Enter your registered credentials or select a predefined role.'}
+                {mode === 'REGISTER' && 'Create a new operator account for field mission logs.'}
+                {mode === 'USERS' && 'Manage all active accounts stored in local persistence.'}
               </p>
             </div>
 
-            <div className="flex bg-[#F2EDE4] p-1 rounded-xl">
+            <div className="flex bg-[#F2EDE4] p-1 rounded-xl shrink-0">
               <button
                 onClick={() => setMode('LOGIN')}
                 className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
@@ -483,94 +487,245 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
               >
                 Register
               </button>
+              <button
+                onClick={() => setMode('USERS')}
+                className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${
+                  mode === 'USERS' ? 'bg-[#FF6F59] text-white shadow-xs' : 'text-[#736B5E]'
+                }`}
+              >
+                Directory ({registeredUsers.length})
+              </button>
             </div>
           </div>
 
-          <form onSubmit={handleFormSubmit} className="space-y-4">
-            {mode === 'REGISTER' && (
+          {/* Mode: Sign In Form */}
+          {mode === 'LOGIN' && (
+            <form onSubmit={handleLoginFormSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Full Name & Title</label>
+                <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Email Address</label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                  <Mail className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
                   <input
-                    type="text"
+                    type="email"
                     required
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    placeholder="e.g. Commander Sarah Connor"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="admin@marinesight.ai"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
                   />
                 </div>
               </div>
-            )}
 
-            <div>
-              <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Email Address</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
-                <input
-                  type="email"
-                  required
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="admin@marinesight.ai"
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
-                />
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-[#5C5449]">Password</label>
+                  <span className="text-[11px] text-[#8C8275]">Predefined: admin123 / operator123</span>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-[#8C8275] hover:text-[#2A2A2A]"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-bold text-[#5C5449]">Password</label>
-                <span className="text-[11px] text-[#8C8275]">Predefined: admin123 / operator123</span>
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
-                />
+              <div className="pt-2">
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-[#8C8275] hover:text-[#2A2A2A]"
+                  type="submit"
+                  className="w-full py-3 rounded-2xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-[#FF6F59]/30 transition-all hover:scale-[1.01]"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <LogIn className="w-4 h-4" />
+                  <span>Authenticate & Enter MarineSight AI</span>
                 </button>
               </div>
-            </div>
+            </form>
+          )}
 
-            {mode === 'REGISTER' && (
-              <div>
-                <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Assigned Operational Role</label>
-                <select
-                  value={roleInput}
-                  onChange={(e) => setRoleInput(e.target.value as UserRole)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-bold text-[#2A2A2A] focus:border-[#FF6F59] focus:outline-none"
-                >
-                  <option value="ADMIN">ADMIN (Super Administrator & AI Architect)</option>
-                  <option value="MARINE_OPERATOR">MARINE_OPERATOR (Sonar & Drone Fleet Lead)</option>
-                  <option value="RESEARCHER">RESEARCHER (Acoustics & Drift Modeling)</option>
-                  <option value="CLEANUP_TEAM">CLEANUP_TEAM (Field Salvage Operations)</option>
-                  <option value="VIEWER">VIEWER (Public Observer & Citizen Science)</option>
-                </select>
+          {/* Mode: Register Form */}
+          {mode === 'REGISTER' && (
+            <form onSubmit={handleRegisterFormSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Full Name & Title</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      required
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      placeholder="e.g. Commander Sarah Connor"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                    <input
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="sarah.connor@marinesight.ai"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-[#FF6F59]/30 transition-all hover:scale-[1.01]"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>{mode === 'LOGIN' ? 'Authenticate & Enter MarineSight AI' : 'Create Operational Account'}</span>
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="At least 4 characters"
+                      className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-[#8C8275] hover:text-[#2A2A2A]"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Confirm Password</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={confirmPasswordInput}
+                      onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                      placeholder="Re-type password"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Organization / Unit</label>
+                  <div className="relative">
+                    <Building className="w-4 h-4 text-[#8C8275] absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={orgInput}
+                      onChange={(e) => setOrgInput(e.target.value)}
+                      placeholder="e.g. Coast Guard District 4"
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-medium focus:border-[#FF6F59] focus:bg-white focus:outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#5C5449] mb-1.5">Assigned Operational Role</label>
+                  <select
+                    value={roleInput}
+                    onChange={(e) => setRoleInput(e.target.value as UserRole)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#F9F6F0] border border-[#E3DBD0] text-xs font-bold text-[#2A2A2A] focus:border-[#FF6F59] focus:outline-none"
+                  >
+                    <option value="ADMIN">ADMIN (Super Administrator & AI Architect)</option>
+                    <option value="MARINE_OPERATOR">MARINE_OPERATOR (Sonar & Drone Fleet Lead)</option>
+                    <option value="RESEARCHER">RESEARCHER (Acoustics & Drift Modeling)</option>
+                    <option value="CLEANUP_TEAM">CLEANUP_TEAM (Field Salvage Operations)</option>
+                    <option value="VIEWER">VIEWER (Public Observer & Citizen Science)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  className="w-full py-3 rounded-2xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-[#FF6F59]/30 transition-all hover:scale-[1.01]"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Create Account & Start Session</span>
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Mode: Registered Users Directory */}
+          {mode === 'USERS' && (
+            <div className="space-y-3">
+              <p className="text-xs text-[#736B5E]">
+                All registered accounts currently saved in MarineSight storage:
+              </p>
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {registeredUsers.map((u) => {
+                  const isActive = currentUser.email.toLowerCase() === u.email.toLowerCase() && isLoggedIn;
+                  return (
+                    <div 
+                      key={u.id}
+                      className={`p-3 rounded-2xl border flex items-center justify-between transition-all ${
+                        isActive ? 'bg-[#FF6F59]/10 border-[#FF6F59]' : 'bg-[#F9F6F0] border-[#E8E1D5]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <img src={u.avatarUrl} alt="" className="w-9 h-9 rounded-xl object-cover border border-[#E3DBD0]" />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-[#2A2A2A]">{u.name}</p>
+                            <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-white border border-[#E3DBD0]">
+                              {u.role}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#736B5E]">{u.email} • {u.organization}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {isActive ? (
+                          <span className="text-[10px] font-bold text-[#4F6F52] bg-[#4F6F52]/10 px-2 py-1 rounded-lg">
+                            Active
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              const res = marineStorage.login(u.email, u.password || 'admin123');
+                              if (res.success && res.user) {
+                                setCurrentUser(res.user);
+                                setIsLoggedIn(true);
+                                showNotification(`Switched session to ${res.user.name}`, 'success');
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAE4D9] text-[#2A2A2A] text-xs font-bold border border-[#E3DBD0] transition-colors"
+                          >
+                            Sign In As
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </form>
+          )}
+
         </div>
 
         {/* Security Clearance & Active Session Info Card */}
@@ -601,25 +756,35 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
                 <span className="font-mono font-bold text-[#FF6F59]">CSPDarknet + RepNCSP</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#8C8275]">Session Idle Timeout:</span>
-                <span className="font-mono font-bold text-[#2A2A2A]">12 Hours Active</span>
+                <span className="text-[#8C8275]">Session State Storage:</span>
+                <span className="font-mono font-bold text-[#2A2A2A]">Local Encrypted State</span>
               </div>
             </div>
           </div>
 
           <div className="pt-4 border-t border-[#F2EDE4] space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-[#2A2A2A]">Currently Signed In:</span>
+              <span className="font-bold text-[#2A2A2A]">Current Account:</span>
               <span className="font-mono font-bold text-[#FF6F59]">{currentUser.email}</span>
             </div>
 
-            <button
-              onClick={() => setLogoutModalOpen(true)}
-              className="w-full py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition-colors flex items-center justify-center gap-2"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Log Out / Terminate Active Session</span>
-            </button>
+            {isLoggedIn ? (
+              <button
+                onClick={() => setLogoutModalOpen(true)}
+                className="w-full py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold border border-rose-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Log Out / Terminate Active Session</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => setMode('LOGIN')}
+                className="w-full py-2.5 px-4 rounded-xl bg-[#4F6F52]/15 hover:bg-[#4F6F52]/25 text-[#4F6F52] text-xs font-bold border border-[#4F6F52]/30 transition-colors flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In to Unlock Operational Tools</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -641,7 +806,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
             <div>
               <h3 className="text-lg font-extrabold text-[#2A2A2A]">Confirm Session Termination</h3>
               <p className="text-xs text-[#736B5E] mt-1">
-                Are you sure you want to log out of <strong>{currentUser.name}</strong> ({currentUser.email})? You can switch to another predefined account at any time.
+                Are you sure you want to log out of <strong>{currentUser.name}</strong> ({currentUser.email})? Your active privileges will be paused and switched to Guest Viewer.
               </p>
             </div>
 
@@ -666,3 +831,4 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
     </div>
   );
 };
+

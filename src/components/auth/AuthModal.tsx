@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { X, ShieldCheck, User, Lock, Mail, CheckCircle2, Waves, ArrowRight } from 'lucide-react';
-import { DEMO_USERS } from '../../data/sampleData';
+import { X, ShieldCheck, User, Lock, Mail, CheckCircle2, Waves, ArrowRight, AlertCircle, LogIn, UserPlus } from 'lucide-react';
 import { UserProfile, UserRole } from '../../types';
-import { marineStorage } from '../../services/storage';
+import { marineStorage, DEFAULT_ACCOUNTS } from '../../services/storage';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,27 +16,55 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('MARINE_OPERATOR');
   const [isRegister, setIsRegister] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSelectDemoUser = (user: UserProfile) => {
-    marineStorage.setCurrentUser(user);
-    onSuccess();
-    onClose();
+  const handleSelectDemoUser = (user: typeof DEFAULT_ACCOUNTS[0]) => {
+    const res = marineStorage.login(user.email, user.password || 'admin123');
+    if (res.success) {
+      onSuccess();
+      onClose();
+    } else {
+      setErrorMsg(res.message);
+    }
   };
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser: UserProfile = {
-      id: `usr-${Date.now().toString().slice(-4)}`,
-      name: name || email.split('@')[0] || 'Marine Analyst',
-      email: email || 'operator@marinesight.ai',
-      role: role,
-      organization: 'MarineSight AI Environmental Field Team'
-    };
-    marineStorage.setCurrentUser(newUser);
-    onSuccess();
-    onClose();
+    setErrorMsg(null);
+    if (!email.trim()) {
+      setErrorMsg("Please enter a valid email address.");
+      return;
+    }
+
+    if (isRegister) {
+      if (!name.trim()) {
+        setErrorMsg("Please enter your name.");
+        return;
+      }
+      const res = marineStorage.register({
+        name: name.trim(),
+        email: email.trim(),
+        password: password || 'admin123',
+        role: role,
+        organization: 'MarineSight AI Environmental Operations'
+      });
+      if (res.success) {
+        onSuccess();
+        onClose();
+      } else {
+        setErrorMsg(res.message);
+      }
+    } else {
+      const res = marineStorage.login(email.trim(), password || 'admin123');
+      if (res.success) {
+        onSuccess();
+        onClose();
+      } else {
+        setErrorMsg(res.message);
+      }
+    }
   };
 
   return (
@@ -57,7 +84,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
             </div>
             <div>
               <h3 className="font-extrabold text-base text-[#2A2A2A]">MarineSight AI Access Portal</h3>
-              <p className="text-xs text-[#736B5E]">Secure role-based marine intelligence sign in</p>
+              <p className="text-xs text-[#736B5E]">Secure role-based marine intelligence sign in & account management</p>
             </div>
           </div>
 
@@ -69,7 +96,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
         {/* Tab Switcher */}
         <div className="px-6 pt-4 flex gap-2 border-b border-[#E8E1D5]">
           <button
-            onClick={() => setActiveTab('demo')}
+            onClick={() => { setActiveTab('demo'); setErrorMsg(null); }}
             className={`pb-3 text-xs font-bold transition-colors border-b-2 ${
               activeTab === 'demo'
                 ? 'border-[#FF6F59] text-[#FF6F59]'
@@ -80,16 +107,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
           </button>
 
           <button
-            onClick={() => setActiveTab('email')}
+            onClick={() => { setActiveTab('email'); setErrorMsg(null); }}
             className={`pb-3 text-xs font-bold transition-colors border-b-2 ${
               activeTab === 'email'
                 ? 'border-[#FF6F59] text-[#FF6F59]'
                 : 'border-transparent text-[#736B5E] hover:text-[#2A2A2A]'
             }`}
           >
-            {isRegister ? 'Register Account' : 'Email Sign In'}
+            {isRegister ? 'Create Account' : 'Account Sign In'}
           </button>
         </div>
+
+        {/* Error Alert */}
+        {errorMsg && (
+          <div className="mx-6 mt-4 p-3 rounded-xl bg-rose-100 text-rose-800 border border-rose-200 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         {/* Body Content */}
         <div className="p-6">
@@ -100,7 +135,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
                 Select a pre-configured role to immediately explore with realistic operational permissions:
               </p>
 
-              {DEMO_USERS.map((user) => (
+              {DEFAULT_ACCOUNTS.map((user) => (
                 <button
                   key={user.id}
                   onClick={() => handleSelectDemoUser(user)}
@@ -190,15 +225,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-extrabold shadow-md shadow-[#FF6F59]/30 transition-all"
+                className="w-full py-3 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-extrabold shadow-md shadow-[#FF6F59]/30 transition-all flex items-center justify-center gap-2"
               >
-                {isRegister ? 'Create Account & Access' : 'Sign In with Firebase'}
+                {isRegister ? <UserPlus className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
+                <span>{isRegister ? 'Create Account & Start Session' : 'Sign In to Account'}</span>
               </button>
 
               <div className="text-center pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsRegister(!isRegister)}
+                  onClick={() => { setIsRegister(!isRegister); setErrorMsg(null); }}
                   className="text-xs text-[#736B5E] hover:text-[#FF6F59] font-medium"
                 >
                   {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Register"}
@@ -213,3 +249,4 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
     </div>
   );
 };
+

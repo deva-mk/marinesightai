@@ -13,11 +13,16 @@ import {
   ExternalLink,
   ChevronDown,
   Navigation,
-  CheckCircle2
+  CheckCircle2,
+  LogOut,
+  LogIn,
+  UserPlus,
+  User,
+  Key,
+  ShieldAlert
 } from 'lucide-react';
-import { marineStorage } from '../../services/storage';
+import { marineStorage, DEFAULT_ACCOUNTS } from '../../services/storage';
 import { UserProfile, UserRole } from '../../types';
-import { DEMO_USERS } from '../../data/sampleData';
 import { downloadProjectZip } from '../../services/zipExport';
 import confetti from 'canvas-confetti';
 
@@ -56,6 +61,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  
+  const isLoggedIn = marineStorage.isLoggedIn() && currentUser.email !== 'guest@marinesight.public';
 
   const handleDownloadZip = async () => {
     try {
@@ -77,6 +84,13 @@ export const Header: React.FC<HeaderProps> = ({
       setToastMsg("Demo data reset to clean baseline!");
       setTimeout(() => setToastMsg(null), 3000);
     }
+  };
+
+  const handleLogout = () => {
+    marineStorage.logout();
+    setShowRoleDropdown(false);
+    setToastMsg("You have successfully logged out of your account.");
+    setTimeout(() => setToastMsg(null), 4000);
   };
 
   const handleLocateMe = () => {
@@ -220,93 +234,137 @@ export const Header: React.FC<HeaderProps> = ({
             <RotateCcw className="w-4 h-4" />
           </button>
 
-          {/* Role Switcher & Profile */}
-          <div className="relative">
+          {/* Direct Sign In Button when Logged Out */}
+          {!isLoggedIn ? (
             <button
-              onClick={() => setShowRoleDropdown(!showRoleDropdown)}
-              className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white border border-[#E3DBD0] hover:border-[#FF6F59] shadow-sm transition-colors text-left"
+              onClick={() => {
+                if (onOpenAuth) onOpenAuth();
+                else setActiveView?.('auth');
+              }}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#FF6F59] to-[#E0533D] text-white text-xs font-extrabold shadow-sm hover:opacity-95 transition-all hover:scale-105"
             >
-              <img
-                src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
-                alt={currentUser.name}
-                className="w-7 h-7 rounded-lg object-cover border border-[#E8E1D5]"
-              />
-              <div className="hidden xl:block">
-                <p className="text-xs font-bold text-[#2A2A2A] leading-tight truncate max-w-[110px]">
-                  {currentUser.name}
-                </p>
-                <p className="text-[10px] font-semibold text-[#FF6F59] uppercase tracking-wider">
-                  {currentUser.role.replace('_', ' ')}
-                </p>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-[#8C8275]" />
+              <LogIn className="w-4 h-4" />
+              <span>Sign In / Register</span>
             </button>
-
-            {/* Dropdown */}
-            {showRoleDropdown && (
-              <div 
-                className="absolute right-0 mt-2 w-64 bg-white border border-[#E3DBD0] rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-                onClick={() => setShowRoleDropdown(false)}
+          ) : (
+            /* Logged-In User Account & Role Switcher */
+            <div className="relative">
+              <button
+                onClick={() => setShowRoleDropdown(!showRoleDropdown)}
+                className="flex items-center gap-2 p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl bg-white border border-[#E3DBD0] hover:border-[#FF6F59] shadow-sm transition-colors text-left"
               >
-                <div className="px-4 py-2 border-b border-[#F2EDE4]">
-                  <p className="text-xs font-bold text-[#2A2A2A]">{currentUser.name}</p>
-                  <p className="text-[11px] text-[#736B5E] truncate">{currentUser.email}</p>
-                  <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#FF6F59]/10 text-[#FF6F59]">
-                    Current Role: {currentUser.role}
-                  </span>
-                </div>
-
-                <div className="px-3 py-1.5">
-                  <p className="text-[10px] font-bold text-[#8C8275] uppercase tracking-wider mb-1">
-                    Switch Demo Persona:
+                <img
+                  src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                  alt={currentUser.name}
+                  className="w-7 h-7 rounded-lg object-cover border border-[#E8E1D5]"
+                />
+                <div className="hidden xl:block">
+                  <p className="text-xs font-bold text-[#2A2A2A] leading-tight truncate max-w-[110px]">
+                    {currentUser.name}
                   </p>
-                  {DEMO_USERS.map((user) => (
+                  <p className="text-[10px] font-semibold text-[#FF6F59] uppercase tracking-wider">
+                    {currentUser.role.replace('_', ' ')}
+                  </p>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-[#8C8275]" />
+              </button>
+
+              {/* Dropdown Menu */}
+              {showRoleDropdown && (
+                <div 
+                  className="absolute right-0 mt-2 w-72 bg-white border border-[#E3DBD0] rounded-2xl shadow-xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                  onClick={() => setShowRoleDropdown(false)}
+                >
+                  <div className="px-4 py-2.5 border-b border-[#F2EDE4] bg-[#F9F6F0]/60">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-extrabold text-[#2A2A2A]">{currentUser.name}</p>
+                      <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-[#4F6F52]/10 text-[#4F6F52] border border-[#4F6F52]/20">
+                        ONLINE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#736B5E] truncate mt-0.5">{currentUser.email}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-[#FF6F59]/10 text-[#FF6F59]">
+                        Role: {currentUser.role}
+                      </span>
+                      <span className="text-[10px] text-[#8C8275] truncate">
+                        {currentUser.organization}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Switch Persona Fast Menu */}
+                  <div className="px-3 py-2 border-b border-[#F2EDE4]">
+                    <p className="text-[10px] font-bold text-[#8C8275] uppercase tracking-wider mb-1.5">
+                      Switch Demo Persona:
+                    </p>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                      {DEFAULT_ACCOUNTS.map((user) => (
+                        <button
+                          key={user.id}
+                          onClick={() => {
+                            marineStorage.setCurrentUser(user);
+                            setToastMsg(`Switched active account to ${user.name} (${user.role})`);
+                            setTimeout(() => setToastMsg(null), 3000);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium text-left transition-colors ${
+                            currentUser.role === user.role && currentUser.email === user.email
+                              ? 'bg-[#FF6F59]/15 text-[#D94C36] font-bold'
+                              : 'hover:bg-[#F9F6F0] text-[#2A2A2A]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <img src={user.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
+                            <div>
+                              <p className="leading-tight text-xs">{user.name}</p>
+                              <p className="text-[9px] text-[#736B5E]">{user.role.replace('_', ' ')}</p>
+                            </div>
+                          </div>
+                          {currentUser.role === user.role && currentUser.email === user.email && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6F59]" />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Navigation & Logout Links */}
+                  <div className="px-3 pt-2 space-y-1">
                     <button
-                      key={user.id}
-                      onClick={() => marineStorage.setCurrentUser(user)}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium text-left transition-colors ${
-                        currentUser.role === user.role
-                          ? 'bg-[#FF6F59]/15 text-[#D94C36] font-bold'
-                          : 'hover:bg-[#F9F6F0] text-[#2A2A2A]'
-                      }`}
+                      onClick={() => setActiveView?.('auth')}
+                      className="w-full text-left px-2.5 py-2 rounded-xl text-xs font-bold text-[#2A2A2A] hover:bg-[#F2EDE4] transition-colors flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
-                        <img src={user.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
-                        <div>
-                          <p className="leading-tight">{user.name}</p>
-                          <p className="text-[10px] text-[#736B5E]">{user.role.replace('_', ' ')}</p>
-                        </div>
+                        <Key className="w-3.5 h-3.5 text-[#FF6F59]" />
+                        <span>Account & Security Hub</span>
                       </div>
-                      {currentUser.role === user.role && <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6F59]" />}
+                      <ShieldCheck className="w-3.5 h-3.5 text-[#4F6F52]" />
                     </button>
-                  ))}
-                </div>
 
-                <div className="px-3 pt-2 border-t border-[#F2EDE4] space-y-1">
-                  <button
-                    onClick={() => setActiveView?.('auth')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold text-[#FF6F59] hover:bg-[#FF6F59]/10 transition-colors flex items-center justify-between"
-                  >
-                    <span>Login & Session Hub</span>
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setActiveView?.('models')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#5C5449] hover:bg-[#F2EDE4] transition-colors flex items-center justify-between"
-                  >
-                    <span>YOLO Training Studio</span>
-                    <Sparkles className="w-3.5 h-3.5 text-[#FF6F59]" />
-                  </button>
-                  <button
-                    onClick={() => setActiveView?.('settings')}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#5C5449] hover:bg-[#F2EDE4] transition-colors"
-                  >
-                    System Profile & Keys
-                  </button>
+                    <button
+                      onClick={() => setActiveView?.('settings')}
+                      className="w-full text-left px-2.5 py-2 rounded-xl text-xs font-medium text-[#5C5449] hover:bg-[#F2EDE4] transition-colors flex items-center gap-2"
+                    >
+                      <User className="w-3.5 h-3.5 text-[#8C8275]" />
+                      <span>Profile & System Keys</span>
+                    </button>
+
+                    {/* Prominent Log Out Button */}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-2.5 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-100 transition-colors flex items-center justify-between mt-1"
+                    >
+                      <div className="flex items-center gap-2">
+                        <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Log Out of Account</span>
+                      </div>
+                      <span className="text-[10px] text-rose-500 font-semibold">End Session</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
       </div>
@@ -321,3 +379,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

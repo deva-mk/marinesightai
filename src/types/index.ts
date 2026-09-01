@@ -7,6 +7,11 @@ export interface UserProfile {
   role: UserRole;
   organization: string;
   avatarUrl?: string;
+  password?: string;
+  token?: string;
+  lastLogin?: string;
+  status?: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED';
+  phone?: string;
 }
 
 export type DebrisCategory = 

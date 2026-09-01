@@ -22,9 +22,13 @@ import {
   Sparkles,
   Waves,
   Key,
-  ShieldCheck
+  ShieldCheck,
+  LogOut,
+  LogIn,
+  UserCheck
 } from 'lucide-react';
 import { UserRole } from '../../types';
+import { marineStorage } from '../../services/storage';
 
 interface SidebarProps {
   activeTab?: string;
@@ -77,6 +81,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const currentActive = activeView || activeTab || 'dashboard';
   const isMobileOpen = Boolean(isOpenMobile ?? mobileOpen);
+  const currentUser = marineStorage.getCurrentUser();
+  const isLoggedIn = marineStorage.isLoggedIn() && currentUser.email !== 'guest@marinesight.public';
 
   const activeIncidents = counts?.activeIncidents ?? incidentsCount ?? 0;
   const activeMissions = counts?.activeMissions ?? missionsCount ?? 0;
@@ -130,9 +136,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ]
     },
     {
-      title: 'ADMINISTRATION & SESSIONS',
+      title: 'ACCOUNT & SECURITY',
       items: [
-        { id: 'auth', label: 'Login & Sessions', icon: Key, badge: 'RBAC', badgeColor: 'bg-[#FF6F59] text-white' },
+        { id: 'auth', label: isLoggedIn ? 'Account & Profile' : 'Login / Register', icon: Key, badge: isLoggedIn ? 'ACTIVE' : 'GUEST', badgeColor: isLoggedIn ? 'bg-[#4F6F52] text-white' : 'bg-[#FF6F59] text-white' },
         { id: 'users', label: 'Team & Roles', icon: Users, allowedRoles: ['ADMIN'] },
         { id: 'settings', label: 'System Settings', icon: Settings }
       ]
@@ -143,6 +149,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (setActiveView) setActiveView(viewId);
     if (onSelectTab) onSelectTab(viewId);
     if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleLogout = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    marineStorage.logout();
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleLogin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleSelect('auth');
   };
 
   return (
@@ -221,17 +238,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Bottom Operational Status Card */}
-        <div className="p-3 border-t border-[#E3DBD0] bg-[#ECE5D8]/60 m-2 rounded-2xl">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#4F6F52] animate-ping" />
-            <span className="text-[11px] font-bold text-[#4F6F52] uppercase tracking-wide">
-              Acoustic Grid Online
-            </span>
+        {/* Bottom User Account Session Card with Logout/Login Trigger */}
+        <div className="p-3 border-t border-[#E3DBD0] bg-[#ECE5D8]/80 m-2 rounded-2xl">
+          <div 
+            onClick={() => handleSelect('auth')}
+            className="flex items-center justify-between gap-2 cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <img 
+                src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
+                alt="" 
+                className="w-8 h-8 rounded-xl object-cover border border-[#D5CCBE] shrink-0" 
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-bold text-[#2A2A2A] truncate leading-tight group-hover:text-[#FF6F59] transition-colors">
+                    {currentUser.name}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isLoggedIn ? 'bg-[#4F6F52]' : 'bg-amber-500'}`} />
+                  <p className="text-[10px] font-semibold text-[#736B5E] uppercase truncate">
+                    {isLoggedIn ? currentUser.role.replace('_', ' ') : 'Guest Mode'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Logout / Login Action Button */}
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                title="Log Out of Account"
+                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={handleLogin}
+                title="Sign In to Account"
+                className="p-1.5 rounded-lg text-[#FF6F59] hover:bg-[#FF6F59]/10 transition-colors shrink-0"
+              >
+                <LogIn className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <p className="text-[10px] text-[#736B5E] leading-relaxed">
-            Palk Bay & Mannar Transponders Active. 3 Autonomous Drones on schedule.
-          </p>
         </div>
 
       </aside>
