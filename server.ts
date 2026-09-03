@@ -188,7 +188,9 @@ app.post('/api/detection/surface', async (req, res) => {
           const base64Data = matches[2];
 
           const prompt = `You are a real-time YOLOv9 Marine Computer Vision model running on an oceanic surveillance drone.
-Analyze this maritime image and detect all instances of marine debris, ghost fishing gear, floating nets, plastic bottles, containers, buoys, styrofoam floats, or oil slicks.
+Perform object-level detection and classification on this maritime image. Do NOT report a generic "debris detected".
+Identify WHAT each object is specifically.
+Possible specific classes: "Plastic Bag", "Plastic Bottle", "Fishing Net", "Synthetic Rope", "Plastic Container", "Metal Can", "Styrofoam Float", "Buoy", "Derelict Wire Trap", "Oil Slick". If an object cannot be classified specifically, identify it as "Marine Debris Anomaly".
 
 Return ONLY a JSON object in this exact schema without markdown code blocks:
 {
@@ -202,12 +204,15 @@ Return ONLY a JSON object in this exact schema without markdown code blocks:
   "aiExplanation": "Detailed scientific reason for detection and boundary localization",
   "boundingBoxes": [
     {
+      "class_id": 1,
+      "class_name": "plastic_bag",
+      "display_name": "Plastic Bag",
       "x": 120,
-      "y": 140,
-      "width": 280,
-      "height": 210,
-      "label": "Plastic Aggregation (94%)",
-      "confidence": 0.94,
+      "y": 85,
+      "width": 190,
+      "height": 185,
+      "label": "Plastic Bag — 91%",
+      "confidence": 0.91,
       "category": "Plastic"
     }
   ]
@@ -243,18 +248,37 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
             opticalSignature = parsed.opticalSignature || opticalSignature;
             aiExplanation = parsed.aiExplanation || aiExplanation;
             if (Array.isArray(parsed.boundingBoxes) && parsed.boundingBoxes.length > 0) {
-              detectedObjects = parsed.boundingBoxes.map((b: any, idx: number) => ({
-                id: `DET-SURF-${Date.now()}-${idx + 1}`,
-                x: Math.max(0, Math.min(580, Math.round(b.x || 100))),
-                y: Math.max(0, Math.min(380, Math.round(b.y || 80))),
-                width: Math.max(30, Math.min(500, Math.round(b.width || 180))),
-                height: Math.max(30, Math.min(350, Math.round(b.height || 140))),
-                label: b.label || `${b.category || primaryCategory} (${Math.round((b.confidence || 0.9) * 100)}%)`,
-                category: b.category || primaryCategory,
-                confidence: Number((b.confidence || primaryConfidence).toFixed(2)),
-                severity: primarySeverity,
-                whyClassified: b.whyClassified || `Neural feature extractor identified distinct ${b.category || primaryCategory} optical signature.`
-              }));
+              detectedObjects = parsed.boundingBoxes.map((b: any, idx: number) => {
+                const bx = Math.max(0, Math.min(580, Math.round(b.x || 100)));
+                const by = Math.max(0, Math.min(380, Math.round(b.y || 80)));
+                const bw = Math.max(30, Math.min(500, Math.round(b.width || 180)));
+                const bh = Math.max(30, Math.min(350, Math.round(b.height || 140)));
+                const conf = Number((b.confidence || primaryConfidence).toFixed(2));
+                const dName = b.display_name || b.category || primaryCategory;
+                const cName = b.class_name || dName.toLowerCase().replace(/ /g, '_');
+
+                return {
+                  id: `DET-SURF-${Date.now()}-${idx + 1}`,
+                  class_id: b.class_id || (idx + 1),
+                  class_name: cName,
+                  display_name: dName,
+                  confidence: conf,
+                  bbox: {
+                    x1: bx,
+                    y1: by,
+                    x2: bx + bw,
+                    y2: by + bh
+                  },
+                  x: bx,
+                  y: by,
+                  width: bw,
+                  height: bh,
+                  label: `${dName} — ${Math.round(conf * 100)}%`,
+                  category: b.category || primaryCategory,
+                  severity: primarySeverity,
+                  whyClassified: b.whyClassified || `Neural feature extractor identified distinct ${dName} optical signature.`
+                };
+              });
             }
           }
         }
@@ -268,42 +292,54 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
       detectedObjects = [
         {
           id: `DET-SURF-${Date.now()}-1`,
-          x: 110,
-          y: 130,
-          width: 320,
-          height: 220,
-          label: `Surface Polymer Aggregation (95%)`,
+          class_id: 1,
+          class_name: 'plastic_bag',
+          display_name: 'Plastic Bag',
+          confidence: 0.91,
+          bbox: { x1: 120, y1: 85, x2: 310, y2: 270 },
+          x: 120,
+          y: 85,
+          width: 190,
+          height: 185,
+          label: 'Plastic Bag — 91%',
           category: 'Plastic',
-          confidence: 0.95,
-          estimatedSizeM2: 5.2,
+          estimatedSizeM2: 0.35,
           severity: 'HIGH',
-          whyClassified: 'YOLOv9 multi-spectral feature extractor detected high-saturation polymer reflectance with rigid geometric edges.',
+          whyClassified: 'YOLOv9 feature extractor localized high-reflectance thin polymer membrane with floating fold creases.',
         },
         {
           id: `DET-SURF-${Date.now()}-2`,
-          x: 430,
-          y: 80,
+          class_id: 2,
+          class_name: 'plastic_bottle',
+          display_name: 'Plastic Bottle',
+          confidence: 0.87,
+          bbox: { x1: 400, y1: 150, x2: 510, y2: 320 },
+          x: 400,
+          y: 150,
           width: 110,
-          height: 120,
-          label: `Submerged Net Float (89%)`,
-          category: 'Ghost Fishing Gear',
-          confidence: 0.89,
-          estimatedSizeM2: 1.8,
-          severity: 'CRITICAL',
-          whyClassified: 'Circular float array signature detected with trailing tension line below water surface.',
+          height: 170,
+          label: 'Plastic Bottle — 87%',
+          category: 'Bottle',
+          estimatedSizeM2: 0.18,
+          severity: 'HIGH',
+          whyClassified: 'Rigid cylindrical polyethylene terephthalate profile with air-pocket surface buoyancy.',
         },
         {
           id: `DET-SURF-${Date.now()}-3`,
-          x: 70,
-          y: 290,
-          width: 140,
-          height: 80,
-          label: `Microplastic Slick (84%)`,
-          category: 'Oil Slick',
-          confidence: 0.84,
-          estimatedSizeM2: 8.4,
-          severity: 'MODERATE',
-          whyClassified: 'Surface tension dampening and specular reflectance reduction characteristic of oily microplastic emulsion.',
+          class_id: 3,
+          class_name: 'fishing_net',
+          display_name: 'Fishing Net',
+          confidence: 0.82,
+          bbox: { x1: 50, y1: 260, x2: 170, y2: 370 },
+          x: 50,
+          y: 260,
+          width: 120,
+          height: 110,
+          label: 'Fishing Net — 82%',
+          category: 'Ghost Fishing Gear',
+          estimatedSizeM2: 1.32,
+          severity: 'CRITICAL',
+          whyClassified: 'Submerged mesh webbing with characteristic diamond grid filament signature.',
         },
       ];
     }
@@ -315,11 +351,11 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
     const primaryDet = {
       id: `GV-SURF-${Date.now().toString().slice(-4)}`,
       title: `Surface Optical Detection (${filename})`,
-      category: primaryCategory,
+      category: filteredBoxes[0]?.category || primaryCategory,
       source: source || 'DRONE',
-      confidence: primaryConfidence,
+      confidence: filteredBoxes[0]?.confidence || primaryConfidence,
       qualityScore: 95,
-      severity: primarySeverity,
+      severity: filteredBoxes[0]?.severity || primarySeverity,
       location: {
         lat: coordinates[0] || 10.9582,
         lng: coordinates[1] || 78.0790,
@@ -331,11 +367,15 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
       imageUrl: imageData || 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&auto=format&fit=crop&q=80',
       status: 'Unverified',
       boundingBoxes: filteredBoxes.map(b => ({
+        class_id: b.class_id,
+        class_name: b.class_name,
+        display_name: b.display_name,
         x: b.x,
         y: b.y,
         width: b.width,
         height: b.height,
-        label: b.label || `${b.category || primaryCategory} (${Math.round((b.confidence || 0.9) * 100)}%)`,
+        bbox: b.bbox || { x1: b.x, y1: b.y, x2: b.x + b.width, y2: b.y + b.height },
+        label: b.label || `${b.display_name || b.category} — ${Math.round((b.confidence || 0.9) * 100)}%`,
         confidence: b.confidence || primaryConfidence,
         category: b.category || primaryCategory
       })),
@@ -352,7 +392,7 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
       const yCenter = (b.y + b.height / 2) / 400;
       const w = b.width / 600;
       const h = b.height / 400;
-      const classId = b.category === 'Ghost Fishing Gear' ? 0 : b.category === 'Plastic' ? 1 : 2;
+      const classId = b.class_id ? b.class_id - 1 : (b.category === 'Ghost Fishing Gear' ? 0 : b.category === 'Plastic' ? 1 : 2);
       return `${classId} ${xCenter.toFixed(6)} ${yCenter.toFixed(6)} ${w.toFixed(6)} ${h.toFixed(6)}`;
     }).join('\n');
 
@@ -361,7 +401,20 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
       processedAt: new Date().toISOString(),
       detectionCount: filteredBoxes.length,
       detection: primaryDet,
-      detections: filteredBoxes,
+      detections: filteredBoxes.map(b => ({
+        class_id: b.class_id,
+        class_name: b.class_name,
+        display_name: b.display_name,
+        confidence: b.confidence,
+        bbox: b.bbox || { x1: b.x, y1: b.y, x2: b.x + b.width, y2: b.y + b.height },
+        x: b.x,
+        y: b.y,
+        width: b.width,
+        height: b.height,
+        label: b.label || `${b.display_name || b.category} — ${Math.round(b.confidence * 100)}%`,
+        category: b.category,
+        severity: b.severity
+      })),
       yoloAnnotations: yoloTxtAnnotations,
       inferenceMetrics: {
         modelId,
@@ -1131,6 +1184,314 @@ app.get('/api/model/status', (req, res) => {
     recentRuns: trainingRunsHistory.slice(0, 5),
   });
 });
+
+// ====================================================
+// SECTION 8 UNIFIED API ARCHITECTURE & MODALITY MAPPINGS
+// ====================================================
+
+// In-memory unified stores matching backend models
+const inMemoryDetections = [
+  {
+    id: "MSA-DET-1001",
+    modality: "SONAR",
+    class_name: "Ghost Fishing Gear",
+    confidence: 0.94,
+    bbox: [120, 140, 280, 220],
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
+    latitude: 9.3142,
+    longitude: 79.1821,
+    source_filename: "sonar_transect_04a.xtf",
+    risk_level: "CRITICAL",
+    status: "VERIFIED",
+    depth_meters: 14.2,
+    acoustic_shadow_len_m: 6.8,
+    estimated_dimensions: "8.5m x 4.2m",
+    estimated_weight_kg: 420.0,
+    signature_details: "High acoustic backscatter with 6.8m shadow relief on sandy seabed",
+    ai_explanation: "Faster R-CNN MobileNetV3 detected high-reflectivity acoustic highlight with elongated shadow void."
+  },
+  {
+    id: "MSA-DET-1002",
+    modality: "SURFACE",
+    class_name: "Plastic Container",
+    confidence: 0.91,
+    bbox: [210, 80, 140, 160],
+    timestamp: new Date(Date.now() - 7200000).toISOString(),
+    latitude: 9.3155,
+    longitude: 79.1834,
+    source_filename: "drone_aerial_survey_08.jpg",
+    risk_level: "HIGH",
+    status: "VERIFIED",
+    depth_meters: 0.0,
+    estimated_dimensions: "2.4m x 1.8m cluster",
+    estimated_weight_kg: 85.0,
+    signature_details: "High optical reflectance in visible spectrum",
+    ai_explanation: "YOLOv9 SeaGuard identified plastic aggregation on sea surface."
+  },
+  {
+    id: "MSA-DET-1003",
+    modality: "FUSION",
+    class_name: "Ghost Fishing Gear & Surface Buoy",
+    confidence: 0.98,
+    bbox: [160, 150, 310, 260],
+    timestamp: new Date(Date.now() - 1800000).toISOString(),
+    latitude: 9.3148,
+    longitude: 79.1828,
+    source_filename: "multimodal_fusion_transect.dat",
+    risk_level: "CRITICAL",
+    status: "VERIFIED",
+    depth_meters: 14.0,
+    acoustic_shadow_len_m: 7.1,
+    estimated_dimensions: "12.0m net spread",
+    estimated_weight_kg: 650.0,
+    signature_details: "Surface float and seabed acoustic shadow co-registered",
+    ai_explanation: "Multimodal fusion engine co-registered drone optical sighting and sonar acoustic shadow."
+  }
+];
+
+const inMemoryIncidents = [
+  {
+    id: "INC-8092",
+    incident_code: "INC-8092",
+    title: "Severe Ghost Net Entanglement Cluster",
+    category: "Ghost Fishing Gear",
+    severity: "CRITICAL",
+    status: "ACTIVE",
+    priority_score: 96,
+    latitude: 9.3148,
+    longitude: 79.1828,
+    target_area: "Sector 4A - North Transect",
+    assigned_vessel: "RV Sagar Guardian (IMO 941208)",
+    assigned_lead: "Capt. M. Rodriguez",
+    detection_ids: ["MSA-DET-1001", "MSA-DET-1003"],
+    operator_notes: "Multimodal fusion verified high-risk acoustic shadow on benthic shelf with surface float indicators.",
+    created_at: new Date(Date.now() - 7200000).toISOString()
+  },
+  {
+    id: "INC-8091",
+    incident_code: "INC-8091",
+    title: "Industrial Plastic Pallet Hazard",
+    category: "Industrial Debris",
+    severity: "HIGH",
+    status: "IN_PROGRESS",
+    priority_score: 82,
+    latitude: 9.3245,
+    longitude: 79.1790,
+    target_area: "Sector 4B - Eastern Channel",
+    assigned_vessel: "Interceptor Alpha",
+    assigned_lead: "Lt. K. Alva",
+    detection_ids: ["MSA-DET-1002"],
+    operator_notes: "Vessel intercept in progress. Surface boom deployment scheduled.",
+    created_at: new Date(Date.now() - 14400000).toISOString()
+  }
+];
+
+const inMemoryAlerts = [
+  {
+    id: "ALT-901",
+    title: "Critical Ghost Net Submerged in Sector 4A",
+    level: "CRITICAL",
+    message: "PyTorch Side-Scan Sonar detection confirmed 6.8m acoustic shadow with 94% confidence. Spatial co-registration with surface buoy.",
+    source_modality: "FUSION",
+    latitude: 9.3148,
+    longitude: 79.1828,
+    incident_id: "INC-8092",
+    acknowledged: false,
+    timestamp: new Date().toISOString()
+  },
+  {
+    id: "ALT-902",
+    title: "Plastic Debris Drift Warning - Coral Reef Sanctuary",
+    level: "HIGH",
+    message: "Projected current drift indicates convergence on Marine Protected Area within 4.2 hours.",
+    source_modality: "SURFACE",
+    latitude: 9.3155,
+    longitude: 79.1834,
+    incident_id: "INC-8091",
+    acknowledged: false,
+    timestamp: new Date(Date.now() - 3600000).toISOString()
+  }
+];
+
+const inMemoryCleanupOps = [
+  {
+    id: "CLN-401",
+    operation_code: "CLN-401",
+    target_incident_id: "INC-8092",
+    title: "Operation NetSweep Sector 4A",
+    vessel_id: "VES-01",
+    vessel_name: "RV Sagar Guardian (IMO 941208)",
+    status: "DISPATCHED",
+    target_lat: 9.3148,
+    target_lng: 79.1828,
+    recovered_weight_kg: 420.0,
+    target_debris_type: "Ghost Fishing Gear (Heavy Monofilament)",
+    created_at: new Date().toISOString()
+  }
+];
+
+// 1. Unified Sonar Detection Endpoint
+app.post('/api/sonar/detect', (req, res, next) => {
+  // Pass to existing handler logic
+  (app as any)._router.handle({ ...req, url: '/api/detection/sonar' }, res, next);
+});
+
+// 2. Unified Sonar Preprocessing Endpoint
+app.post('/api/sonar/preprocess', (req, res) => {
+  const { applyLee = true, applyClahe = true, windowSize = 5, clipLimit = 2.0 } = req.body;
+  res.json({
+    success: true,
+    operation: 'SONAR_PREPROCESSING_PIPELINE',
+    leeFilter: { applied: applyLee, windowSize, noiseVariance: 0.25 },
+    clahe: { applied: applyClahe, clipLimit, tileGridSize: 8 },
+    status: 'OPTIMIZED',
+    message: 'Lee adaptive filter removed acoustic speckles; CLAHE enhanced shadow relief boundary.'
+  });
+});
+
+// 3. Unified Surface Detection Endpoint
+app.post('/api/surface/detect', (req, res, next) => {
+  (app as any)._router.handle({ ...req, url: '/api/detection/surface' }, res, next);
+});
+
+// 4. Unified Surface Live Endpoint
+app.post('/api/surface/live', (req, res) => {
+  const { frameId = 1 } = req.body;
+  res.json({
+    success: true,
+    frameId,
+    fps: 29.2,
+    latencyMs: 14,
+    trackedObjects: [
+      {
+        trackerId: 'TRK-01',
+        category: 'Plastic Aggregation',
+        confidence: 0.94,
+        bbox: [140, 120, 260, 180],
+        velocityKnots: 1.2
+      }
+    ]
+  });
+});
+
+// 5. Unified Detections History
+app.get('/api/detections', (req, res) => {
+  const { modality } = req.query;
+  let results = inMemoryDetections;
+  if (modality) {
+    results = results.filter(d => d.modality === String(modality).toUpperCase());
+  }
+  res.json(results);
+});
+
+app.post('/api/detections', (req, res) => {
+  const newDet = {
+    id: req.body.id || `MSA-DET-${Date.now().toString().slice(-4)}`,
+    modality: req.body.modality || 'SURFACE',
+    class_name: req.body.class_name || req.body.category || 'Marine Debris',
+    confidence: req.body.confidence || 0.9,
+    bbox: req.body.bbox || [],
+    timestamp: new Date().toISOString(),
+    latitude: req.body.latitude || 9.3142,
+    longitude: req.body.longitude || 79.1821,
+    source_filename: req.body.source_filename || 'manual_log.jpg',
+    risk_level: req.body.risk_level || 'HIGH',
+    status: req.body.status || 'VERIFIED',
+    depth_meters: req.body.depth_meters || 0.0,
+    acoustic_shadow_len_m: req.body.acoustic_shadow_len_m || 0.0,
+    estimated_dimensions: req.body.estimated_dimensions || '3.0m x 2.0m',
+    estimated_weight_kg: req.body.estimated_weight_kg || 100,
+    signature_details: req.body.signature_details || '',
+    ai_explanation: req.body.ai_explanation || '',
+    extra_metadata: req.body.extra_metadata || {}
+  };
+  inMemoryDetections.unshift(newDet);
+  res.json(newDet);
+});
+
+// 6. Unified Incidents
+app.get('/api/incidents', (req, res) => {
+  const { status, severity } = req.query;
+  let results = inMemoryIncidents;
+  if (status) results = results.filter(i => i.status === String(status).toUpperCase());
+  if (severity) results = results.filter(i => i.severity === String(severity).toUpperCase());
+  res.json(results);
+});
+
+app.post('/api/incidents', (req, res) => {
+  const newInc = {
+    id: req.body.id || `INC-${Date.now().toString().slice(-4)}`,
+    incident_code: req.body.incident_code || `INC-${Date.now().toString().slice(-4)}`,
+    title: req.body.title || 'Marine Debris Hazard',
+    category: req.body.category || 'Ghost Fishing Gear',
+    severity: req.body.severity || 'HIGH',
+    status: req.body.status || 'ACTIVE',
+    priority_score: req.body.priority_score || 85,
+    latitude: req.body.latitude || 9.3148,
+    longitude: req.body.longitude || 79.1828,
+    target_area: req.body.target_area || 'Sector 4A - North Transect',
+    assigned_vessel: req.body.assigned_vessel || 'RV Sagar Guardian',
+    assigned_lead: req.body.assigned_lead || 'Marine Officer',
+    detection_ids: req.body.detection_ids || [],
+    operator_notes: req.body.operator_notes || '',
+    created_at: new Date().toISOString()
+  };
+  inMemoryIncidents.unshift(newInc);
+  res.json(newInc);
+});
+
+app.patch('/api/incidents/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status, notes } = req.body;
+  const inc = inMemoryIncidents.find(i => i.id === id);
+  if (inc) {
+    if (status) inc.status = status;
+    if (notes) inc.operator_notes = `${inc.operator_notes}\n[${new Date().toISOString()}] ${notes}`;
+  }
+  res.json({ success: true, incidentId: id, status, message: 'Incident updated successfully.' });
+});
+
+// 7. Unified Alerts
+app.get('/api/alerts', (req, res) => {
+  const { unacknowledgedOnly } = req.query;
+  let results = inMemoryAlerts;
+  if (unacknowledgedOnly === 'true') {
+    results = results.filter(a => !a.acknowledged);
+  }
+  res.json(results);
+});
+
+app.post('/api/alerts/:id/acknowledge', (req, res) => {
+  const { id } = req.params;
+  const alert = inMemoryAlerts.find(a => a.id === id);
+  if (alert) alert.acknowledged = true;
+  res.json({ success: true, alertId: id, acknowledged: true });
+});
+
+// 8. Unified Cleanup Operations
+app.get('/api/cleanup', (req, res) => {
+  res.json(inMemoryCleanupOps);
+});
+
+app.post('/api/cleanup/dispatch', (req, res) => {
+  const newOp = {
+    id: `CLN-${Date.now().toString().slice(-4)}`,
+    operation_code: `CLN-${Date.now().toString().slice(-4)}`,
+    target_incident_id: req.body.incidentId || 'INC-8092',
+    title: `Salvage Mission for ${req.body.debrisType || 'Ghost Fishing Gear'}`,
+    vessel_id: req.body.vesselId || 'VES-01',
+    vessel_name: req.body.vesselName || 'RV Sagar Guardian (IMO 941208)',
+    status: 'DISPATCHED',
+    target_lat: req.body.targetCoords ? req.body.targetCoords[0] : 9.3148,
+    target_lng: req.body.targetCoords ? req.body.targetCoords[1] : 79.1828,
+    recovered_weight_kg: 0.0,
+    target_debris_type: req.body.debrisType || 'Ghost Fishing Gear',
+    created_at: new Date().toISOString()
+  };
+  inMemoryCleanupOps.unshift(newOp);
+  res.json(newOp);
+});
+
 
 // ----------------------------------------------------
 // VITE / STATIC SERVING

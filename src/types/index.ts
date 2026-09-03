@@ -36,13 +36,25 @@ export type IncidentStatus = 'NEW' | 'VERIFIED' | 'ASSIGNED' | 'IN_PROGRESS' | '
 export type MissionStatus = 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
 
 export interface BoundingBox {
+  id?: string;
+  class_id?: number;
+  class_name?: string;
+  display_name?: string;
   x: number;
   y: number;
   width: number;
   height: number;
+  bbox?: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+  };
   label?: string;
   confidence?: number;
   category?: string;
+  severity?: SeverityLevel;
+  whyClassified?: string;
 }
 
 export interface DetectionRecord {

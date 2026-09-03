@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { DetectionRecord, IncidentRecord, HotspotRecord, CleanupMission, DroneMission } from '../../types';
 import { SAMPLE_DRONE_MISSIONS } from '../../data/sampleData';
+import { LeafletOceanMap } from './LeafletOceanMap';
 
 interface HotspotMapProps {
   detections?: DetectionRecord[];
@@ -149,6 +150,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
   };
 
   // State Management
+  const [mapEngine, setMapEngine] = useState<'LEAFLET' | 'TACTICAL'>('LEAFLET');
   const [selectedTarget, setSelectedTarget] = useState<any>(defaultHotspot);
   const [selectedTargetType, setSelectedTargetType] = useState<'HOTSPOT' | 'INCIDENT' | 'DETECTION' | 'CUSTOM'>('HOTSPOT');
   const [activeSector, setActiveSector] = useState<string>('ALL');
@@ -476,6 +478,30 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
 
         {/* Global Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Leaflet vs Tactical Radar Grid Switcher */}
+          <div className="flex items-center bg-[#F2EDE4] p-1 rounded-xl border border-[#DDD5C7] text-xs font-bold">
+            <button
+              onClick={() => setMapEngine('LEAFLET')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                mapEngine === 'LEAFLET' ? 'bg-[#FF6F59] text-white shadow-xs' : 'text-[#5C5449] hover:text-[#2A2A2A]'
+              }`}
+              title="Interactive Leaflet & React-Leaflet GIS engine with real ocean bathymetric tiles and GPS tracks"
+            >
+              <Compass className="w-3.5 h-3.5" />
+              <span>Leaflet Engine</span>
+            </button>
+            <button
+              onClick={() => setMapEngine('TACTICAL')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                mapEngine === 'TACTICAL' ? 'bg-[#4F6F52] text-white shadow-xs' : 'text-[#5C5449] hover:text-[#2A2A2A]'
+              }`}
+              title="Mathematical SVG nautical radar and coordinate grid"
+            >
+              <Radar className="w-3.5 h-3.5" />
+              <span>Tactical Grid</span>
+            </button>
+          </div>
+
           <button
             onClick={handleLocateMe}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#4F6F52] text-xs font-bold text-[#4F6F52] hover:bg-[#4F6F52] hover:text-white transition-all shadow-xs cursor-pointer"
@@ -713,7 +739,27 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Map Stage (8 Cols) */}
-        <div className="lg:col-span-8 bg-[#0F1713] rounded-3xl border border-[#273830] p-4 shadow-xl text-white relative min-h-[600px] flex flex-col justify-between overflow-hidden">
+        {mapEngine === 'LEAFLET' ? (
+          <div className="lg:col-span-8 flex flex-col">
+            <LeafletOceanMap
+              detections={filteredDetections}
+              incidents={filteredIncidents}
+              hotspots={safeHotspots}
+              missions={safeMissions}
+              onSelectTarget={(type, id) => {
+                if (type === 'incident') {
+                  const inc = safeIncidents.find(i => i.id === id);
+                  if (inc) {
+                    setSelectedTarget(inc);
+                    setSelectedTargetType('INCIDENT');
+                  }
+                }
+              }}
+              onNavigate={onNavigate}
+            />
+          </div>
+        ) : (
+          <div className="lg:col-span-8 bg-[#0F1713] rounded-3xl border border-[#273830] p-4 shadow-xl text-white relative min-h-[600px] flex flex-col justify-between overflow-hidden">
           
           {/* Top Floating Radar Metadata Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 z-20">
@@ -1086,6 +1132,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
           </div>
 
         </div>
+        )}
 
         {/* Selected Target Inspector Panel (4 Cols) */}
         <div className="lg:col-span-4 space-y-4">

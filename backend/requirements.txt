@@ -1,0 +1,40 @@
+# AI-Powered Underwater Marine Debris Detection System
+# Full-Stack & ML Architecture Requirements
+# Matches System Architecture Specification
+
+# Backend API Core & ASGI Web Server
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+
+# Data Validation & Configuration Management
+pydantic>=2.6.4
+pydantic-settings>=2.6.4
+
+# Database ORM & Async Embedded Database
+sqlalchemy>=2.0.28
+aiosqlite>=0.20.0
+
+# File Upload & Streaming Multipart Parser
+python-multipart>=0.0.9
+
+# Asynchronous HTTP Client
+httpx>=0.27.0
+
+# Deep Learning Engine & Computer Vision
+torch>=2.2.0
+torchvision>=0.17.0
+
+# Image Processing & Augmentation
+opencv-python-headless>=4.9.0
+albumentations>=1.3.1
+pillow>=10.0.0
+
+# Scientific Computing & Acoustic Processing
+numpy>=1.26.0
+scipy>=1.12.0
+scikit-image>=0.22.0
+
+# Testing & Quality
+pytest>=8.0.0
+pytest-asyncio>=0.23.5
+ruff>=0.3.0

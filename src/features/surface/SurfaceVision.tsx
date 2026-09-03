@@ -180,13 +180,20 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
           imageUrl: targetUrl,
           status: 'Unverified',
           boundingBoxes: realResult.detectedObjects.map(b => ({
+            id: b.id,
+            class_id: b.class_id,
+            class_name: b.class_name,
+            display_name: b.display_name,
             x: b.x,
             y: b.y,
             width: b.width,
             height: b.height,
+            bbox: b.bbox || { x1: b.x, y1: b.y, x2: b.x + b.width, y2: b.y + b.height },
             label: b.label,
             confidence: b.confidence,
-            category: b.category
+            category: b.category,
+            severity: b.severity,
+            whyClassified: b.whyClassified
           })),
           estimatedDimensions: realResult.estimatedDimensions,
           estimatedWeightKg: realResult.estimatedWeightKg,
@@ -217,11 +224,34 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
           imageData: targetUrl
         });
 
-        if (response && response.success && response.detection) {
+        if (response && response.success) {
+          const rawDetections = response.detections || (response.detection && response.detection.boundingBoxes) || [];
+          const mappedBoxes = rawDetections.map((b: any) => {
+            const dName = b.display_name || (b.label?.includes('—') ? b.label.split('—')[0].trim() : b.category) || 'Marine Object';
+            const conf = b.confidence || 0.90;
+            return {
+              id: b.id,
+              class_id: b.class_id,
+              class_name: b.class_name,
+              display_name: dName,
+              x: b.x,
+              y: b.y,
+              width: b.width,
+              height: b.height,
+              bbox: b.bbox || { x1: b.x, y1: b.y, x2: b.x + b.width, y2: b.y + b.height },
+              label: b.label || `${dName} — ${Math.round(conf * 100)}%`,
+              confidence: conf,
+              category: b.category || 'Plastic',
+              severity: b.severity || 'HIGH',
+              whyClassified: b.whyClassified
+            };
+          });
+
           const det: DetectionRecord = {
-            ...response.detection,
+            ...(response.detection || selectedDetection),
             imageUrl: targetUrl,
-            category: response.detection.category || categoryHint || 'Plastic'
+            category: response.detection?.category || (mappedBoxes[0]?.category as any) || categoryHint || 'Plastic',
+            boundingBoxes: mappedBoxes
           };
 
           marineStorage.addDetection(det);
@@ -601,9 +631,13 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
 
                   {/* Bounding Box rendering */}
                   {showBoxes && filteredBoxes.map((box, idx) => {
-                    const isNet = box.category === 'Ghost Fishing Gear' || box.label?.includes('Net');
+                    const isNet = box.category === 'Ghost Fishing Gear' || box.label?.toLowerCase().includes('net') || box.class_name?.includes('net');
                     const boxColor = isNet ? 'border-[#FF6F59] bg-[#FF6F59]/20' : 'border-[#4F6F52] bg-[#4F6F52]/20';
                     const tagBg = isNet ? 'bg-[#FF6F59]' : 'bg-[#4F6F52]';
+                    const confPct = Math.round((box.confidence || selectedDetection.confidence) * 100);
+                    const rawName = box.display_name || (box.label?.includes('—') ? box.label.split('—')[0].trim() : (box.category || selectedDetection.category));
+                    const objName = rawName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    const tagText = `${objName} — ${confPct}%`;
 
                     return (
                       <div
@@ -617,7 +651,7 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
                         }}
                       >
                         <div className={`absolute -top-6 left-0 ${tagBg} text-white text-[10px] font-extrabold px-2 py-0.5 rounded shadow-xs whitespace-nowrap`}>
-                          {box.label || `${box.category || selectedDetection.category} (${Math.round((box.confidence || selectedDetection.confidence) * 100)}%)`}
+                          {tagText}
                         </div>
                       </div>
                     );
@@ -650,6 +684,82 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
                   <div>
                     <span className="text-[#736B5E] text-[10px] block">Execution Hardware</span>
                     <span className="font-mono font-bold text-[#736B5E] text-[10px] truncate">{inferenceMetrics.device}</span>
+                  </div>
+                </div>
+
+                {/* Object-Level Detection Results Breakdown */}
+                <div className="p-4 rounded-2xl bg-[#F9F6F0] border border-[#E8E1D5] space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#E8E1D5] pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-4 h-4 text-[#FF6F59]" />
+                      <span className="font-extrabold text-xs text-[#2A2A2A] uppercase tracking-wide">
+                        Object-Level Detection Results
+                      </span>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-[#4F6F52]/15 text-[#4F6F52] border border-[#4F6F52]/20">
+                      Total Objects Detected: {filteredBoxes.length}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {filteredBoxes.map((b, idx) => {
+                      const confPercent = Math.round((b.confidence || selectedDetection.confidence) * 100);
+                      const rawName = b.display_name || (b.label?.includes('—') ? b.label.split('—')[0].trim() : (b.category || selectedDetection.category));
+                      const objName = rawName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                      const isNet = b.category === 'Ghost Fishing Gear' || objName.toLowerCase().includes('net');
+
+                      return (
+                        <div 
+                          key={idx}
+                          className="p-3 rounded-xl bg-white border border-[#E8E1D5] hover:border-[#4F6F52] transition-all shadow-2xs space-y-2"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-[#2A2A2A] text-white flex items-center justify-center text-[10px] font-mono font-bold">
+                                {idx + 1}
+                              </span>
+                              <span className="text-xs font-extrabold text-[#2A2A2A]">
+                                {objName}
+                              </span>
+                            </div>
+                            <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md ${
+                              isNet ? 'bg-[#FF6F59]/15 text-[#FF6F59]' : 'bg-[#4F6F52]/15 text-[#4F6F52]'
+                            }`}>
+                              Confidence: {confPercent}%
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[11px] font-mono text-[#5C5449] bg-[#F9F6F0] p-2 rounded-lg border border-[#E8E1D5]">
+                            <div>
+                              <span className="text-[#8C8275] block text-[9px] uppercase font-sans font-bold">Location</span>
+                              <span>x={Math.round(b.x)}, y={Math.round(b.y)}</span>
+                            </div>
+                            <div>
+                              <span className="text-[#8C8275] block text-[9px] uppercase font-sans font-bold">Size</span>
+                              <span>{Math.round(b.width)} × {Math.round(b.height)} px</span>
+                            </div>
+                            {b.bbox && (
+                              <div className="col-span-2 text-[10px] pt-1 border-t border-[#E8E1D5]/60">
+                                <span className="text-[#8C8275] block text-[9px] uppercase font-sans font-bold">BBox Coordinates</span>
+                                <span>[x1: {Math.round(b.bbox.x1)}, y1: {Math.round(b.bbox.y1)}, x2: {Math.round(b.bbox.x2)}, y2: {Math.round(b.bbox.y2)}]</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {b.whyClassified && (
+                            <p className="text-[10px] text-[#736B5E] leading-relaxed italic">
+                              {b.whyClassified}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {filteredBoxes.length === 0 && (
+                      <div className="col-span-2 p-6 text-center text-xs text-[#736B5E] bg-white rounded-xl border border-dashed border-[#E8E1D5]">
+                        No marine debris objects detected meeting confidence threshold ({Math.round(confidenceSlider * 100)}%).
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -818,22 +928,27 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
               </div>
 
               {/* Track Overlay Boxes */}
-              {activeVideoTracks.map((trk) => (
-                <div
-                  key={trk.trackerId}
-                  className="absolute border-2 border-emerald-400 bg-emerald-400/20 rounded-lg pointer-events-none transition-all"
-                  style={{
-                    left: `${(trk.currentBox.x / 600) * 100}%`,
-                    top: `${(trk.currentBox.y / 400) * 100}%`,
-                    width: `${(trk.currentBox.width / 600) * 100}%`,
-                    height: `${(trk.currentBox.height / 400) * 100}%`
-                  }}
-                >
-                  <div className="absolute -top-6 left-0 bg-emerald-600 text-white text-[9px] font-mono font-bold px-1.5 py-0.5 rounded whitespace-nowrap shadow">
-                    {trk.trackerId} [{trk.category}] • {trk.estimatedVelocityKnots} kn @ {trk.driftDirectionDeg}°
+              {activeVideoTracks.map((trk) => {
+                const confPct = Math.round(trk.confidence * 100);
+                return (
+                  <div
+                    key={trk.trackerId}
+                    className="absolute border-2 border-emerald-400 bg-emerald-400/20 rounded-lg pointer-events-none transition-all"
+                    style={{
+                      left: `${(trk.currentBox.x / 600) * 100}%`,
+                      top: `${(trk.currentBox.y / 400) * 100}%`,
+                      width: `${(trk.currentBox.width / 600) * 100}%`,
+                      height: `${(trk.currentBox.height / 400) * 100}%`
+                    }}
+                  >
+                    <div className="absolute -top-6 left-0 bg-emerald-700 text-white text-[9px] font-mono font-bold px-2 py-0.5 rounded-md whitespace-nowrap shadow flex items-center gap-1">
+                      <span className="text-emerald-200">{trk.trackerId}:</span>
+                      <span>{trk.category} — {confPct}%</span>
+                      <span className="text-emerald-300">[{trk.estimatedVelocityKnots} kn @ {trk.driftDirectionDeg}°]</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Video Telemetry Bar */}
@@ -842,8 +957,52 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
                 Active Trackers: <strong className="text-[#2A2A2A]">{activeVideoTracks.length}</strong>
               </span>
               <span className="text-[#4F6F52] font-bold">
-                ASSOCIATION: IoU Threshold 0.30 • Kalman Velocity Drift Filter
+                OBJECT-LEVEL TRACKING: IoU Threshold 0.30 • Kalman Velocity Drift Filter
               </span>
+            </div>
+
+            {/* Video Detections Breakdown Panel */}
+            <div className="p-4 rounded-2xl bg-[#F9F6F0] border border-[#E8E1D5] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#E8E1D5] pb-2">
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#FF6F59]" />
+                  <span className="font-extrabold text-xs text-[#2A2A2A] uppercase tracking-wide">
+                    Live Video Object-Level Detections
+                  </span>
+                </div>
+                <span className="text-xs font-extrabold text-[#4F6F52] bg-[#4F6F52]/10 px-2 py-0.5 rounded-full">
+                  Total Objects Tracked: {activeVideoTracks.length}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {activeVideoTracks.map((trk, idx) => (
+                  <div key={trk.trackerId} className="p-3 rounded-xl bg-white border border-[#E8E1D5] space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#2A2A2A] flex items-center gap-1">
+                        <span className="w-4 h-4 rounded-full bg-[#2A2A2A] text-white flex items-center justify-center text-[9px]">
+                          {idx + 1}
+                        </span>
+                        {trk.category}
+                      </span>
+                      <span className="text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded text-[11px]">
+                        {Math.round(trk.confidence * 100)}% Conf
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-[#736B5E] bg-[#F9F6F0] p-1.5 rounded">
+                      <div>Location: x={Math.round(trk.currentBox.x)}, y={Math.round(trk.currentBox.y)}</div>
+                      <div>Size: {Math.round(trk.currentBox.width)} × {Math.round(trk.currentBox.height)}</div>
+                      <div className="col-span-2">ID: {trk.trackerId} • Speed: {trk.estimatedVelocityKnots} kn</div>
+                    </div>
+                  </div>
+                ))}
+
+                {activeVideoTracks.length === 0 && (
+                  <div className="col-span-2 p-4 text-center text-xs text-[#736B5E] bg-white rounded-xl border border-dashed border-[#E8E1D5]">
+                    No active video objects currently tracked. Click "Run Video Inference" to start.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

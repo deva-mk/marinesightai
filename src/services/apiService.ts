@@ -213,4 +213,85 @@ export const apiService = {
     if (!res.ok) throw new Error(`Model Status API error: ${res.statusText}`);
     return await res.json();
   },
+
+  // Unified Detections API
+  getDetections: async (modality?: string) => {
+    const url = modality ? `/api/detections?modality=${encodeURIComponent(modality)}` : '/api/detections';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Detections API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  createDetection: async (detection: any) => {
+    const res = await fetch('/api/detections', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(detection),
+    });
+    if (!res.ok) throw new Error(`Create Detection API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Unified Incidents API
+  getIncidents: async (status?: string, severity?: string) => {
+    let url = '/api/incidents';
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    if (severity) params.append('severity', severity);
+    if (params.toString()) url += `?${params.toString()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Incidents API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  updateIncidentStatus: async (incidentId: string, status: string, notes?: string) => {
+    const res = await fetch(`/api/incidents/${encodeURIComponent(incidentId)}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, notes }),
+    });
+    if (!res.ok) throw new Error(`Update Incident API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Unified Alerts API
+  getAlerts: async (unacknowledgedOnly: boolean = false) => {
+    const url = unacknowledgedOnly ? '/api/alerts?unacknowledgedOnly=true' : '/api/alerts';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Alerts API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  acknowledgeAlert: async (alertId: string) => {
+    const res = await fetch(`/api/alerts/${encodeURIComponent(alertId)}/acknowledge`, {
+      method: 'POST',
+    });
+    if (!res.ok) throw new Error(`Acknowledge Alert API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Unified Cleanup API
+  getCleanupOperations: async (status?: string) => {
+    const url = status ? `/api/cleanup?status=${encodeURIComponent(status)}` : '/api/cleanup';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Cleanup API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  dispatchCleanup: async (payload: {
+    incidentId: string;
+    vesselId: string;
+    vesselName?: string;
+    targetCoords?: [number, number];
+    debrisType?: string;
+  }) => {
+    const res = await fetch('/api/cleanup/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Dispatch Cleanup API error: ${res.statusText}`);
+    return await res.json();
+  },
 };
+

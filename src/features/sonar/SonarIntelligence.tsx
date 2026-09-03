@@ -23,6 +23,7 @@ import {
 import { DetectionRecord, IncidentRecord } from '../../types';
 import { marineStorage } from '../../services/storage';
 import { apiService } from '../../services/apiService';
+import { SonarIngestionStudio } from './SonarIngestionStudio';
 
 interface SonarIntelligenceProps {
   detections?: DetectionRecord[];
@@ -76,6 +77,7 @@ export const SonarIntelligence: React.FC<SonarIntelligenceProps> = ({
 }) => {
   const safeDetections = detections || [];
   const sonarList = safeDetections.filter(d => d.source === 'SONAR');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'INGESTION_STUDIO' | 'ANALYSIS'>('INGESTION_STUDIO');
   
   const [selectedDetection, setSelectedDetection] = useState<DetectionRecord>(
     sonarList[0] || {
@@ -225,20 +227,48 @@ export const SonarIntelligence: React.FC<SonarIntelligenceProps> = ({
           </p>
         </div>
 
-        {/* Upload Button */}
-        <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-bold transition-all shadow-sm shadow-[#FF6F59]/30 cursor-pointer">
-          <UploadCloud className="w-4 h-4" />
-          <span>Upload Sonar Recording (.DAT, .XTF, .SL3)</span>
-          <input 
-            type="file" 
-            accept=".png,.jpg,.jpeg,.dat,.sl2,.sl3,.rsd,.svlog,.jsf,.xtf" 
-            className="hidden" 
-            onChange={handleFileUpload}
-          />
-        </label>
+        {/* Workspace Mode Switcher */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center bg-[#F2EDE4] p-1 rounded-xl border border-[#DDD5C7] text-xs font-bold">
+            <button
+              onClick={() => setActiveWorkspaceTab('INGESTION_STUDIO')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+                activeWorkspaceTab === 'INGESTION_STUDIO' ? 'bg-[#FF6F59] text-white shadow-xs' : 'text-[#5C5449] hover:text-[#2A2A2A]'
+              }`}
+            >
+              <Sliders className="w-3.5 h-3.5" />
+              <span>SSS Ingestion & Preprocessing Studio</span>
+            </button>
+            <button
+              onClick={() => setActiveWorkspaceTab('ANALYSIS')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+                activeWorkspaceTab === 'ANALYSIS' ? 'bg-[#4F6F52] text-white shadow-xs' : 'text-[#5C5449] hover:text-[#2A2A2A]'
+              }`}
+            >
+              <Radar className="w-3.5 h-3.5" />
+              <span>Acoustic Target Analysis</span>
+            </button>
+          </div>
+
+          {/* Upload Button */}
+          <label className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FF6F59] hover:bg-[#E0533D] text-white text-xs font-bold transition-all shadow-sm shadow-[#FF6F59]/30 cursor-pointer">
+            <UploadCloud className="w-4 h-4" />
+            <span>Upload Sonar (.DAT, .XTF, .SL3)</span>
+            <input 
+              type="file" 
+              accept=".png,.jpg,.jpeg,.dat,.sl2,.sl3,.rsd,.svlog,.jsf,.xtf" 
+              className="hidden" 
+              onChange={handleFileUpload}
+            />
+          </label>
+        </div>
       </div>
 
-      {/* Preset Hydroacoustic Recordings */}
+      {activeWorkspaceTab === 'INGESTION_STUDIO' ? (
+        <SonarIngestionStudio />
+      ) : (
+        <>
+          {/* Preset Hydroacoustic Recordings */}
       <div className="bg-white p-4 rounded-3xl border border-[#E8E1D5] shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -424,7 +454,7 @@ export const SonarIntelligence: React.FC<SonarIntelligenceProps> = ({
                     >
                       {showLabels && (
                         <div className="absolute -top-6 left-0 bg-[#FF6F59] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                          {box.label || `${selectedDetection.category} (${Math.round(selectedDetection.confidence * 100)}%)`}
+                          {box.label || `${box.display_name || box.category || selectedDetection.category} — ${Math.round((box.confidence || selectedDetection.confidence) * 100)}%`}
                         </div>
                       )}
                     </div>
@@ -554,6 +584,58 @@ export const SonarIntelligence: React.FC<SonarIntelligenceProps> = ({
                 </label>
               </div>
 
+            </div>
+
+            {/* Object-Level Sonar Acoustic Targets */}
+            <div className="bg-[#141A17] p-4 rounded-2xl border border-[#2D3934] space-y-3">
+              <div className="flex items-center justify-between border-b border-[#2D3934] pb-2">
+                <div className="flex items-center gap-2">
+                  <Radio className="w-4 h-4 text-[#FF6F59]" />
+                  <span className="font-extrabold text-xs text-white uppercase tracking-wide">
+                    Hydroacoustic Object Targets
+                  </span>
+                </div>
+                <span className="text-xs font-mono font-bold text-[#4F6F52] bg-[#4F6F52]/15 px-2.5 py-0.5 rounded-full border border-[#4F6F52]/30">
+                  Total Targets Localized: {selectedDetection.boundingBoxes?.length || 0}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {(selectedDetection.boundingBoxes || []).map((box, idx) => {
+                  const confPct = Math.round((box.confidence || selectedDetection.confidence) * 100);
+                  const rawName = box.display_name || (box.label?.includes('—') ? box.label.split('—')[0].trim() : (box.category || selectedDetection.category));
+                  const objName = rawName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+                  return (
+                    <div 
+                      key={idx}
+                      className="p-3 rounded-xl bg-[#1E2522] border border-[#2D3934] space-y-1.5 text-xs text-gray-200"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center text-[9px] font-mono">
+                            {idx + 1}
+                          </span>
+                          {objName}
+                        </span>
+                        <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-[#FF6F59]/20 text-[#FF6F59] border border-[#FF6F59]/30">
+                          {confPct}% Confidence
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-gray-400 bg-black/40 p-1.5 rounded border border-[#2D3934]/60">
+                        <div>Location: x={Math.round(box.x)}, y={Math.round(box.y)}</div>
+                        <div>Size: {Math.round(box.width)} × {Math.round(box.height)} px</div>
+                        {box.bbox && (
+                          <div className="col-span-2 text-[9px] text-gray-400 pt-0.5">
+                            BBox: [{Math.round(box.bbox.x1)}, {Math.round(box.bbox.y1)}, {Math.round(box.bbox.x2)}, {Math.round(box.bbox.y2)}]
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
           </div>
@@ -694,6 +776,8 @@ export const SonarIntelligence: React.FC<SonarIntelligenceProps> = ({
         </div>
 
       </div>
+      </>
+      )}
 
     </div>
   );

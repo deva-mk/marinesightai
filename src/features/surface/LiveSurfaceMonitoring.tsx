@@ -22,10 +22,14 @@ import { DetectionRecord } from '../../types';
 
 interface LiveBoundingBox {
   id: string;
+  class_id?: number;
+  class_name?: string;
+  display_name?: string;
   x: number;
   y: number;
   width: number;
   height: number;
+  bbox?: { x1: number; y1: number; x2: number; y2: number };
   label: string;
   category: string;
   confidence: number;
@@ -47,22 +51,30 @@ export const LiveSurfaceMonitoring: React.FC<{ onNavigate?: (view: string, id?: 
   const [activeBoxes, setActiveBoxes] = useState<LiveBoundingBox[]>([
     {
       id: 'LIVE-DET-1',
+      class_id: 1,
+      class_name: 'plastic_bag',
+      display_name: 'Plastic Bag',
       x: 140,
       y: 110,
       width: 260,
       height: 180,
-      label: 'Floating Polymer Aggregate (95%)',
+      bbox: { x1: 140, y1: 110, x2: 400, y2: 290 },
+      label: 'Plastic Bag — 95%',
       category: 'Plastic',
       confidence: 0.95,
       severity: 'HIGH'
     },
     {
       id: 'LIVE-DET-2',
+      class_id: 3,
+      class_name: 'fishing_net',
+      display_name: 'Fishing Net',
       x: 430,
       y: 90,
       width: 130,
       height: 140,
-      label: 'Discarded Net Marker (89%)',
+      bbox: { x1: 430, y1: 90, x2: 560, y2: 230 },
+      label: 'Fishing Net — 89%',
       category: 'Ghost Fishing Gear',
       confidence: 0.89,
       severity: 'CRITICAL'
@@ -138,17 +150,27 @@ export const LiveSurfaceMonitoring: React.FC<{ onNavigate?: (view: string, id?: 
 
       if (res && res.success) {
         if (res.detections && res.detections.length > 0) {
-          const boxes: LiveBoundingBox[] = res.detections.map((d: any, idx: number) => ({
-            id: d.id || `LIVE-${Date.now()}-${idx}`,
-            x: d.x,
-            y: d.y,
-            width: d.width,
-            height: d.height,
-            label: d.label || `${d.category} (${Math.round((d.confidence || 0.9) * 100)}%)`,
-            category: d.category || 'Plastic',
-            confidence: d.confidence || 0.94,
-            severity: d.severity || 'HIGH'
-          }));
+          const boxes: LiveBoundingBox[] = res.detections.map((d: any, idx: number) => {
+            const rawName = d.display_name || (d.label?.includes('—') ? d.label.split('—')[0].trim() : d.category) || 'Marine Object';
+            const dName = rawName.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+            const conf = d.confidence || 0.92;
+            const confPct = Math.round(conf * 100);
+            return {
+              id: d.id || `LIVE-${Date.now()}-${idx}`,
+              class_id: d.class_id,
+              class_name: d.class_name,
+              display_name: dName,
+              x: d.x,
+              y: d.y,
+              width: d.width,
+              height: d.height,
+              bbox: d.bbox || { x1: d.x, y1: d.y, x2: d.x + d.width, y2: d.y + d.height },
+              label: `${dName} — ${confPct}%`,
+              category: d.category || 'Plastic',
+              confidence: conf,
+              severity: d.severity || 'HIGH'
+            };
+          });
           setActiveBoxes(boxes);
           const meanConf = boxes.reduce((acc, b) => acc + b.confidence, 0) / boxes.length;
           setCurrentConfidence(Number(meanConf.toFixed(2)));
@@ -392,6 +414,66 @@ export const LiveSurfaceMonitoring: React.FC<{ onNavigate?: (view: string, id?: 
           <div>
             <span className="text-gray-400 text-[10px] uppercase font-bold">Fusion Correlation</span>
             <p className="text-xl font-bold text-white mt-0.5">MATCH FOUND (INC-9042)</p>
+          </div>
+        </div>
+
+        {/* Live Detection Results Breakdown */}
+        <div className="bg-[#141A17] p-4 rounded-2xl border border-[#2D3934] space-y-3">
+          <div className="flex items-center justify-between border-b border-[#2D3934] pb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#FF6F59]" />
+              <span className="font-extrabold text-xs text-white uppercase tracking-wide">
+                Live Frame Object-Level Detections
+              </span>
+            </div>
+            <span className="text-xs font-mono font-bold text-[#4F6F52] bg-[#4F6F52]/15 px-2.5 py-0.5 rounded-full border border-[#4F6F52]/30">
+              Total Objects Detected: {activeBoxes.length}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {activeBoxes.map((box, idx) => {
+              const confPct = Math.round(box.confidence * 100);
+              const objName = box.display_name || box.label.split('—')[0].trim();
+              const isCrit = box.severity === 'CRITICAL' || box.category === 'Ghost Fishing Gear';
+
+              return (
+                <div 
+                  key={box.id}
+                  className="p-3 rounded-xl bg-[#1E2522] border border-[#2D3934] space-y-1.5 text-xs text-gray-200"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-black/60 text-white flex items-center justify-center text-[9px] font-mono">
+                        {idx + 1}
+                      </span>
+                      {objName}
+                    </span>
+                    <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded ${
+                      isCrit ? 'bg-red-900/60 text-red-200 border border-red-700' : 'bg-emerald-900/60 text-emerald-200 border border-emerald-700'
+                    }`}>
+                      {confPct}% Confidence
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1 text-[10px] font-mono text-gray-400 bg-black/40 p-1.5 rounded border border-[#2D3934]/60">
+                    <div>Location: x={Math.round(box.x)}, y={Math.round(box.y)}</div>
+                    <div>Size: {Math.round(box.width)} × {Math.round(box.height)} px</div>
+                    {box.bbox && (
+                      <div className="col-span-2 text-[9px] text-gray-400 pt-0.5">
+                        BBox: [{Math.round(box.bbox.x1)}, {Math.round(box.bbox.y1)}, {Math.round(box.bbox.x2)}, {Math.round(box.bbox.y2)}]
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {activeBoxes.length === 0 && (
+              <div className="col-span-2 p-4 text-center text-xs text-gray-400 bg-[#1E2522] rounded-xl border border-dashed border-[#2D3934]">
+                No marine objects localized in the active optical frame.
+              </div>
+            )}
           </div>
         </div>
 

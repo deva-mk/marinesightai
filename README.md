@@ -1,10 +1,22 @@
-# 🌊 MarineSight AI — Real-Time Marine Debris Detection & Ocean Intelligence Platform
+# 🌊 MarineSight AI — AI-Powered Multimodal Marine Monitoring, Debris Detection, Risk Analysis & Incident Response Platform
 
-**MarineSight AI** is a comprehensive, real-time marine debris detection, oceanographic intelligence, and cleanup coordination platform. Built with a specialized coastal theme (Deep Teal `#4F6F52`, Coral `#FF6F59`, and Warm Sand `#F7F3EA`), it integrates in-browser edge neural vision, multimodal satellite and sonar telemetry, hydrodynamic drift simulation, autonomous recovery fleet management, and AI copilot reasoning.
+**MarineSight AI** is an enterprise-grade, real-time multimodal ocean intelligence platform integrating **Surface Vision (YOLOv9/v8 Optical Surveillance)** and **Subsurface Hydroacoustic Intelligence (Side-Scan Sonar PyTorch Faster R-CNN with Lee Speckle Filtering & CLAHE)**.
+
+Built with a unified architecture, MarineSight AI combines aerial UAV optical imaging, side-scan sonar waterfall transects, Bayesian multimodal sensor fusion, hydrodynamic Eulerian-Lagrangian drift modeling, ecological risk prediction, and live incident command response.
 
 ---
 
-## 🌟 Architecture & Neural Vision Stack
+## 🌟 Architecture & Multimodal Stack Overview
+
+- **Frontend**: React 18, Vite, Tailwind CSS, Leaflet, Lucide React, Recharts
+- **Backend API**: FastAPI (Python 3.10+) with Uvicorn, Pydantic 2, SQLAlchemy 2.0 Async, aiosqlite embedded SQLite database, plus full Node.js / Express fallback compatibility
+- **Deep Learning & Computer Vision**:
+  - **Underwater Sonar**: PyTorch Faster R-CNN with MobileNetV3-Large FPN backbone, Lee speckle noise filter, CLAHE contrast equalization, acoustic shadow relief estimation
+  - **Surface Vision**: YOLOv9 / YOLOv8 marine detection models, video multi-object centroid tracking
+  - **Multimodal Fusion**: Spatial co-registration via Haversine distance and Bayesian joint confidence integration
+  - **Risk Prediction**: Deterministic ecological risk engine with sensitive MPA habitat collision warnings
+- **Tactical AI Copilot**: Google Gemini API integration with domain-calibrated marine operations heuristics fallback
+
 
 ### 👁️ 1. In-Browser Edge Neural Vision (TensorFlow.js + COCO-SSD)
 - **Real-Time On-Device Inference**: Powered by **TensorFlow.js (`@tensorflow/tfjs`)** and **COCO-SSD (`@tensorflow-models/coco-ssd`)** running on lightweight MobileNet backbones via WebGL/WebAssembly acceleration at <15ms latency.
