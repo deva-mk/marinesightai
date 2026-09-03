@@ -112,26 +112,44 @@ class MarineStorageService {
   }
 
   public initDefaults(force = false) {
-    if (force || !localStorage.getItem(STORAGE_KEYS.DETECTIONS)) {
-      localStorage.setItem(STORAGE_KEYS.DETECTIONS, JSON.stringify(SAMPLE_DETECTIONS));
-      localStorage.setItem(STORAGE_KEYS.INCIDENTS, JSON.stringify(SAMPLE_INCIDENTS));
-      localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(SAMPLE_CLEANUP_MISSIONS));
-      localStorage.setItem(STORAGE_KEYS.DRONES, JSON.stringify(SAMPLE_DRONE_MISSIONS));
-      localStorage.setItem(STORAGE_KEYS.HOTSPOTS, JSON.stringify(SAMPLE_HOTSPOTS));
+    const existingDetections = localStorage.getItem(STORAGE_KEYS.DETECTIONS);
+    const hasLegacyPredefined = existingDetections && (
+      existingDetections.includes('GV-1024') || 
+      existingDetections.includes('INC-9042') || 
+      existingDetections.includes('MSN-201')
+    );
+
+    if (force || hasLegacyPredefined || !localStorage.getItem(STORAGE_KEYS.DETECTIONS)) {
+      localStorage.setItem(STORAGE_KEYS.DETECTIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.INCIDENTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.DRONES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.HOTSPOTS, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.MODELS, JSON.stringify(SAMPLE_AI_MODELS));
       localStorage.setItem(STORAGE_KEYS.DATASETS, JSON.stringify(SAMPLE_DATASETS));
-      localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(SAMPLE_ALERTS));
-      localStorage.setItem(STORAGE_KEYS.LIVE_STREAM, JSON.stringify(INITIAL_LIVE_STREAM));
+      localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.LIVE_STREAM, JSON.stringify([]));
       localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(DEFAULT_ACCOUNTS));
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(DEFAULT_ACCOUNTS[0]));
       localStorage.setItem(STORAGE_KEYS.IS_LOGGED_IN, 'true');
       localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, `ms_tok_${Date.now()}`);
-      localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'true');
+      localStorage.setItem(STORAGE_KEYS.DEMO_MODE, 'false');
       this.notifyListeners();
     } else if (!localStorage.getItem(STORAGE_KEYS.REGISTERED_USERS)) {
       localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(DEFAULT_ACCOUNTS));
       localStorage.setItem(STORAGE_KEYS.IS_LOGGED_IN, 'true');
     }
+  }
+
+  public clearAllData() {
+    localStorage.setItem(STORAGE_KEYS.DETECTIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.INCIDENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.DRONES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.HOTSPOTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LIVE_STREAM, JSON.stringify([]));
+    this.notifyListeners();
   }
 
   public subscribe(listener: () => void) {

@@ -90,7 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navSections: NavSection[] = [
     {
-      title: 'OVERVIEW',
+      title: 'COMMAND',
       items: [
         { id: 'dashboard', label: 'Marine Dashboard', icon: LayoutDashboard }
       ]
@@ -101,11 +101,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'sonar', label: 'Sonar Intelligence', icon: Radar },
         { id: 'surface', label: 'Surface Vision', icon: Eye },
         { id: 'live', label: 'Live Monitoring', icon: Video, badge: 'REALTIME' },
-        { id: 'fusion', label: 'Multimodal Fusion', icon: Layers, badge: 'AI', badgeColor: 'bg-[#FF6F59] text-white' }
+        { id: 'fusion', label: 'Multimodal Fusion', icon: Layers, badge: 'AI', badgeColor: 'bg-[#FFFF23] text-black' }
       ]
     },
     {
-      title: 'INTELLIGENCE & MAPS',
+      title: 'MAPS & INTELLIGENCE',
       items: [
         { id: 'hotspots', label: 'Pollution Hotspots', icon: MapPin },
         { id: 'risk', label: 'Risk Prediction', icon: TrendingUp },
@@ -116,29 +116,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'OPERATIONS',
       items: [
-        { id: 'incidents', label: 'Incident Command', icon: AlertTriangle, badge: activeIncidents > 0 ? activeIncidents : undefined, badgeColor: 'bg-[#FF6F59] text-white' },
-        { id: 'cleanup', label: 'Cleanup Missions', icon: Ship, badge: activeMissions > 0 ? activeMissions : undefined, badgeColor: 'bg-[#4F6F52] text-white' },
+        { id: 'incidents', label: 'Incident Command', icon: AlertTriangle, badge: activeIncidents > 0 ? activeIncidents : undefined, badgeColor: 'bg-red-500 text-white' },
+        { id: 'cleanup', label: 'Cleanup Missions', icon: Ship, badge: activeMissions > 0 ? activeMissions : undefined, badgeColor: 'bg-[#2DD4BF] text-black' },
         { id: 'drones', label: 'Drone Missions', icon: Plane },
-        { id: 'alerts', label: 'Alerts Center', icon: Bell, badge: unreadAlerts > 0 ? unreadAlerts : undefined, badgeColor: 'bg-[#FF6F59] text-white' }
+        { id: 'alerts', label: 'Alerts Center', icon: Bell, badge: unreadAlerts > 0 ? unreadAlerts : undefined, badgeColor: 'bg-[#FFFF23] text-black' }
       ]
     },
     {
-      title: 'AI PLATFORM',
+      title: 'AI ENGINE',
       items: [
         { id: 'datasets', label: 'Dataset Lab', icon: Database },
         { id: 'models', label: 'Model Registry', icon: Cpu }
       ]
     },
     {
-      title: 'REPORTS',
+      title: 'REPORTS & DATA',
       items: [
         { id: 'reports', label: 'Reports & Exports', icon: FileText }
       ]
     },
     {
-      title: 'ACCOUNT & SECURITY',
+      title: 'AUTHENTICATION',
       items: [
-        { id: 'auth', label: isLoggedIn ? 'Account & Profile' : 'Login / Register', icon: Key, badge: isLoggedIn ? 'ACTIVE' : 'GUEST', badgeColor: isLoggedIn ? 'bg-[#4F6F52] text-white' : 'bg-[#FF6F59] text-white' },
+        { id: 'auth', label: isLoggedIn ? 'Account & Profile' : 'Login / Register', icon: Key, badge: isLoggedIn ? 'ACTIVE' : 'GUEST', badgeColor: isLoggedIn ? 'bg-[#2DD4BF] text-black' : 'bg-[#FFFF23] text-black' },
         { id: 'users', label: 'Team & Roles', icon: Users, allowedRoles: ['ADMIN'] },
         { id: 'settings', label: 'System Settings', icon: Settings }
       ]
@@ -167,26 +167,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 lg:hidden"
           onClick={onCloseMobile}
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container in Heynesh style */}
       <aside className={`
-        fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#F2EDE4] border-r border-[#E3DBD0] flex flex-col transition-transform duration-200 ease-in-out
+        fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#0C0D0E] border-r border-[#20232A] flex flex-col transition-transform duration-200 ease-in-out text-white select-none
         lg:static lg:translate-x-0
         ${isMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
       `}>
         
         {/* Header on mobile */}
-        <div className="flex items-center justify-between p-4 lg:hidden border-b border-[#E3DBD0]">
+        <div className="flex items-center justify-between p-4 lg:hidden border-b border-[#20232A]">
           <div className="flex items-center gap-2">
-            <Waves className="w-5 h-5 text-[#FF6F59]" />
-            <span className="font-extrabold text-sm tracking-tight text-[#2A2A2A]">MARINESIGHT AI</span>
+            <div className="w-7 h-7 rounded-lg bg-[#FFFF23] text-black flex items-center justify-center font-black">
+              <Waves className="w-4 h-4" />
+            </div>
+            <span className="font-extrabold text-sm tracking-tight text-white">MARINESIGHT AI</span>
           </div>
-          <button onClick={onCloseMobile} className="p-1 rounded-lg hover:bg-[#E3DBD0]">
-            <X className="w-5 h-5 text-[#5C5449]" />
+          <button onClick={onCloseMobile} className="p-1.5 rounded-lg hover:bg-[#1A1C22] text-stone-400 hover:text-white">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -201,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             return (
               <div key={sIdx} className="space-y-1">
-                <p className="px-3 text-[10px] font-extrabold text-[#8C8275] tracking-wider uppercase mb-1.5">
+                <p className="px-3 text-[10px] font-mono font-bold text-stone-500 tracking-wider uppercase mb-1.5">
                   {section.title}
                 </p>
                 {visibleItems.map((item) => {
@@ -213,20 +215,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       key={item.id}
                       onClick={() => handleSelect(item.id)}
                       className={`
-                        w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-left
+                        w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-left group
                         ${isActive 
-                          ? 'bg-[#FF6F59] text-white shadow-sm shadow-[#FF6F59]/30 font-bold' 
-                          : 'text-[#5C5449] hover:bg-[#EAE4D9] hover:text-[#2A2A2A]'
+                          ? 'bg-[#FFFF23] text-black font-extrabold shadow-[0_0_15px_rgba(255,255,35,0.35)]' 
+                          : 'text-stone-400 hover:bg-[#141518] hover:text-white hover:translate-x-0.5'
                         }
                       `}
                     >
                       <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#736B5E]'}`} />
-                        <span>{item.label}</span>
+                        <Icon className={`w-4 h-4 shrink-0 transition-colors ${isActive ? 'text-black' : 'text-stone-400 group-hover:text-[#FFFF23]'}`} />
+                        <span className="tracking-tight">{item.label}</span>
                       </div>
 
                       {item.badge !== undefined && (
-                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-extrabold ${item.badgeColor || 'bg-[#4F6F52] text-white'}`}>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-black ${item.badgeColor || 'bg-[#2DD4BF] text-black'}`}>
                           {item.badge}
                         </span>
                       )}
@@ -238,8 +240,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Bottom User Account Session Card with Logout/Login Trigger */}
-        <div className="p-3 border-t border-[#E3DBD0] bg-[#ECE5D8]/80 m-2 rounded-2xl">
+        {/* Bottom User Account Session Card in Heynesh style */}
+        <div className="p-3 border-t border-[#20232A] bg-[#121316] m-2 rounded-2xl border">
           <div 
             onClick={() => handleSelect('auth')}
             className="flex items-center justify-between gap-2 cursor-pointer group"
@@ -248,17 +250,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <img 
                 src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'} 
                 alt="" 
-                className="w-8 h-8 rounded-xl object-cover border border-[#D5CCBE] shrink-0" 
+                className="w-8 h-8 rounded-xl object-cover border border-[#25282F] shrink-0" 
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                  <p className="text-xs font-bold text-[#2A2A2A] truncate leading-tight group-hover:text-[#FF6F59] transition-colors">
+                  <p className="text-xs font-bold text-white truncate leading-tight group-hover:text-[#FFFF23] transition-colors">
                     {currentUser.name}
                   </p>
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${isLoggedIn ? 'bg-[#4F6F52]' : 'bg-amber-500'}`} />
-                  <p className="text-[10px] font-semibold text-[#736B5E] uppercase truncate">
+                  <span className={`w-1.5 h-1.5 rounded-full ${isLoggedIn ? 'bg-[#FFFF23] shadow-[0_0_6px_#FFFF23]' : 'bg-stone-500'}`} />
+                  <p className="text-[10px] font-mono font-bold text-stone-400 uppercase truncate">
                     {isLoggedIn ? currentUser.role.replace('_', ' ') : 'Guest Mode'}
                   </p>
                 </div>
@@ -270,7 +272,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={handleLogout}
                 title="Log Out of Account"
-                className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors shrink-0"
+                className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/15 transition-colors shrink-0"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -278,7 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={handleLogin}
                 title="Sign In to Account"
-                className="p-1.5 rounded-lg text-[#FF6F59] hover:bg-[#FF6F59]/10 transition-colors shrink-0"
+                className="p-1.5 rounded-lg text-[#FFFF23] hover:bg-[#FFFF23]/15 transition-colors shrink-0"
               >
                 <LogIn className="w-4 h-4" />
               </button>

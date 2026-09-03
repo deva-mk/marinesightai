@@ -1,22 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Waves, 
   Radar, 
   Eye, 
   Layers, 
-  TrendingUp, 
-  Ship, 
-  ShieldCheck, 
-  Sparkles, 
   ArrowRight, 
   CheckCircle2, 
-  Database, 
-  Cpu, 
-  FileText, 
-  Navigation,
-  Download
+  Download,
+  Sparkles,
+  ShieldAlert,
+  Ship,
+  Compass,
+  Radio,
+  Cpu,
+  Zap,
+  RotateCcw
 } from 'lucide-react';
 import { downloadProjectZip } from '../../services/zipExport';
+import { ScrollytellingSection } from './ScrollytellingSection';
+import { MagneticButton } from '../common/MagneticButton';
+import { AnimatedLogo } from '../common/AnimatedLogo';
+import { AmbientGradients } from '../common/AmbientGradients';
+import { CustomCursor } from '../common/CustomCursor';
+import { HeyneshTicker } from '../common/HeyneshTicker';
+import { Faux3DMarineModel } from '../common/Faux3DMarineModel';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -24,211 +31,289 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth }) => {
+  const [selectedSpecTab, setSelectedSpecTab] = useState<'sonar' | 'vision' | 'fusion'>('sonar');
+
   return (
-    <div className="min-h-screen bg-[#F9F6F0] text-[#2A2A2A]">
-      
-      {/* Top Navbar */}
-      <nav className="sticky top-0 z-40 bg-[#F9F6F0]/90 backdrop-blur-md border-b border-[#E8E1D5] px-6 lg:px-12 py-4">
+    <div className="min-h-screen bg-[#0C0D0E] text-[#F3F3F3] relative selection:bg-[#FFFF23] selection:text-black">
+      {/* Magnetic Cursor */}
+      <CustomCursor />
+
+      {/* Ambient Moving Glow Gradients */}
+      <AmbientGradients intensity="vibrant" />
+
+      {/* Top Floating Glass Navigation */}
+      <nav className="sticky top-0 z-40 bg-[#0C0D0E]/85 backdrop-blur-xl border-b border-[#20232A] px-6 lg:px-12 py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FF6F59] to-[#E0533D] flex items-center justify-center text-white shadow-md shadow-[#FF6F59]/30">
-              <Waves className="w-6 h-6" />
-            </div>
-            <div>
-              <span className="font-extrabold text-xl tracking-tight text-[#2A2A2A]">
-                GHOST<span className="text-[#FF6F59]">VISION</span>
-              </span>
-              <span className="hidden sm:inline-block ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#4F6F52]/10 text-[#4F6F52] border border-[#4F6F52]/20">
-                Acoustic & Vision Platform
-              </span>
-            </div>
-          </div>
+          {/* Animated Logo with Vector Hover Morphing */}
+          <AnimatedLogo size="md" />
 
+          {/* Nav Actions */}
           <div className="flex items-center gap-3">
-            <button
+            <MagneticButton
               onClick={() => downloadProjectZip()}
-              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-[#DDD5C7] text-xs font-bold text-[#2A2A2A] hover:bg-[#F2EDE4] transition-all shadow-xs"
+              cursorText="ZIP"
+              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#141518] hover:bg-[#1A1C22] border border-[#25282F] text-xs font-bold text-stone-300 hover:text-white transition-all"
             >
-              <Download className="w-4 h-4 text-[#FF6F59]" />
+              <Download className="w-3.5 h-3.5 text-[#FFFF23]" />
               <span>Download Project ZIP</span>
-            </button>
+            </MagneticButton>
 
-            <button
+            <MagneticButton
               onClick={onOpenAuth}
-              className="px-4 py-2 rounded-xl bg-white border border-[#DDD5C7] text-xs font-bold text-[#2A2A2A] hover:border-[#FF6F59] transition-all shadow-xs"
+              cursorText="LOGIN"
+              className="px-4 py-2 rounded-xl bg-[#141518] hover:bg-[#1A1C22] border border-[#25282F] text-xs font-bold text-stone-300 hover:text-white transition-all"
             >
               Sign In
-            </button>
+            </MagneticButton>
 
-            <button
+            <MagneticButton
               onClick={onEnterApp}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FF6F59] text-white hover:bg-[#E0533D] text-xs font-extrabold transition-all shadow-sm shadow-[#FF6F59]/30 group"
+              cursorText="LAUNCH"
+              liquidMorph={true}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFFF23] text-black hover:bg-white text-xs font-black tracking-wide uppercase transition-all shadow-[0_0_15px_rgba(255,255,35,0.4)]"
             >
-              <span>Explore Demo</span>
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
+              <span>Explore Platform</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </MagneticButton>
           </div>
 
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative px-6 lg:px-12 pt-16 pb-20 max-w-7xl mx-auto text-center">
+      {/* Heynesh Infinite Marquee Ticker */}
+      <HeyneshTicker
+        detectionsCount={12}
+        incidentsCount={4}
+        activeMissionsCount={2}
+      />
+
+      {/* ================= HERO SECTION ================= */}
+      <section className="relative px-6 lg:px-12 pt-16 pb-24 max-w-7xl mx-auto text-center z-10">
         
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#FF6F59]/10 border border-[#FF6F59]/20 text-[#D94C36] text-xs font-bold mb-6 animate-pulse">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Multimodal Marine Debris & Underwater Anomaly Intelligence</span>
+        {/* Animated Pill Badge with pulse */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#16181D] border border-[#20232A] text-[#FFFF23] text-xs font-mono font-bold mb-6 shadow-[0_0_15px_rgba(255,255,35,0.15)]">
+          <span className="w-2 h-2 rounded-full bg-[#FFFF23] animate-ping" />
+          <span>Multimodal Hydroacoustic Sonar & Optical Vision Architecture</span>
         </div>
 
-        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-[#2A2A2A] max-w-5xl mx-auto leading-[1.1]">
+        {/* Display Typography */}
+        <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.08]">
           See the Invisible. <br className="hidden sm:block" />
-          <span className="text-[#FF6F59]">Clean the Ocean.</span>
+          <span className="text-[#FFFF23] underline decoration-[#FFFF23]/40 underline-offset-8">
+            Clean the Ocean.
+          </span>
         </h1>
 
-        <p className="mt-6 text-base sm:text-lg text-[#5C5449] max-w-3xl mx-auto leading-relaxed font-medium">
-          MarineSight AI bridges side-scan acoustic sonar, aerial drone computer vision, and geospatial correlation to detect submerged ghost nets, plastic gyres, and underwater hazards before marine habitats collapse.
+        <p className="mt-6 text-sm sm:text-lg text-stone-400 max-w-3xl mx-auto leading-relaxed font-normal">
+          MarineSight AI bridges dual-frequency side-scan acoustic sonar, aerial drone computer vision, and geospatial correlation to detect submerged ghost fishing nets, plastics, and benthic anomalies before marine biospheres collapse.
         </p>
 
-        {/* CTA Group */}
+        {/* Magnetic CTA Group */}
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-          <button
+          <MagneticButton
             onClick={onEnterApp}
-            className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#FF6F59] hover:bg-[#E0533D] text-white font-extrabold text-sm shadow-lg shadow-[#FF6F59]/30 transition-all hover:scale-102"
+            cursorText="COMMAND"
+            liquidMorph={true}
+            className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl bg-[#FFFF23] hover:bg-white text-black font-black text-sm shadow-[0_0_25px_rgba(255,255,35,0.45)] transition-all"
           >
             <span>Launch Live Intelligence Platform</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
+            <ArrowRight className="w-4 h-4 text-black" />
+          </MagneticButton>
 
-          <button
-            onClick={() => downloadProjectZip()}
-            className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-white border border-[#DDD5C7] hover:border-[#2A2A2A] text-[#2A2A2A] font-bold text-sm shadow-sm transition-all"
+          <MagneticButton
+            onClick={() => {
+              const el = document.getElementById('scrollytelling-experience');
+              el?.scrollIntoView({ behavior: 'smooth' });
+            }}
+            cursorText="SCROLL"
+            strength={0.25}
+            className="flex items-center gap-2 px-5 py-3.5 rounded-2xl bg-[#141518] hover:bg-[#1A1C22] border border-[#25282F] hover:border-[#FFFF23]/60 text-white font-bold text-sm transition-all"
           >
-            <Download className="w-4 h-4 text-[#4F6F52]" />
-            <span>Get Source Code (.ZIP)</span>
-          </button>
+            <Radio className="w-4 h-4 text-[#FFFF23]" />
+            <span>Scroll-Driven Tech Tour</span>
+          </MagneticButton>
         </div>
 
-        {/* Key Metrics Banner */}
-        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-          <div className="p-4 rounded-2xl bg-white border border-[#E8E1D5] shadow-xs">
-            <p className="text-2xl sm:text-3xl font-black text-[#FF6F59]">96.2%</p>
-            <p className="text-xs font-bold text-[#5C5449] mt-1">Fusion mAP Accuracy</p>
+        {/* Key Metrics Quick Band */}
+        <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
+          <div className="p-4 rounded-2xl bg-[#121316] border border-[#20232A] glass-morph-card text-left">
+            <p className="text-2xl sm:text-3xl font-black text-[#FFFF23]">96.2%</p>
+            <p className="text-xs font-mono text-stone-400 mt-1 uppercase">Acoustic & Vision mAP</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white border border-[#E8E1D5] shadow-xs">
-            <p className="text-2xl sm:text-3xl font-black text-[#4F6F52]">50+</p>
-            <p className="text-xs font-bold text-[#5C5449] mt-1">Acoustic & Vision Targets</p>
+          <div className="p-4 rounded-2xl bg-[#121316] border border-[#20232A] glass-morph-card text-left">
+            <p className="text-2xl sm:text-3xl font-black text-[#2DD4BF]">455 kHz</p>
+            <p className="text-xs font-mono text-stone-400 mt-1 uppercase">Side-Scan Sonar Chirp</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white border border-[#E8E1D5] shadow-xs">
-            <p className="text-2xl sm:text-3xl font-black text-[#2A2A2A]">1,280 kg</p>
-            <p className="text-xs font-bold text-[#5C5449] mt-1">Ghost Gear Recovered</p>
+          <div className="p-4 rounded-2xl bg-[#121316] border border-[#20232A] glass-morph-card text-left">
+            <p className="text-2xl sm:text-3xl font-black text-white">&lt; 8.4 ms</p>
+            <p className="text-xs font-mono text-stone-400 mt-1 uppercase">Edge YOLOv8 Latency</p>
           </div>
-          <div className="p-4 rounded-2xl bg-white border border-[#E8E1D5] shadow-xs">
-            <p className="text-2xl sm:text-3xl font-black text-[#FF6F59]">100%</p>
-            <p className="text-xs font-bold text-[#5C5449] mt-1">Deployable Cloud Ready</p>
+          <div className="p-4 rounded-2xl bg-[#121316] border border-[#20232A] glass-morph-card text-left">
+            <p className="text-2xl sm:text-3xl font-black text-[#FFFF23]">600m</p>
+            <p className="text-xs font-mono text-stone-400 mt-1 uppercase">Autonomous Depth Rating</p>
           </div>
         </div>
 
       </section>
 
-      {/* Technology Flowchart Architecture Section */}
-      <section className="py-16 bg-[#F2EDE4] border-y border-[#E3DBD0] px-6 lg:px-12">
+      {/* ================= SCROLLYTELLING PINNED SECTION ================= */}
+      <section id="scrollytelling-experience">
+        <ScrollytellingSection onEnterApp={onEnterApp} />
+      </section>
+
+      {/* ================= FAUX 3D HARDWARE INTERACTIVE LAB ================= */}
+      <section className="py-24 px-6 lg:px-12 bg-[#0E0F12] border-t border-[#20232A] relative z-10">
         <div className="max-w-7xl mx-auto">
           
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <h2 className="text-xs font-extrabold text-[#FF6F59] tracking-widest uppercase mb-2">
-              SYSTEM ARCHITECTURE
-            </h2>
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-[#2A2A2A]">
-              End-to-End Multimodal Marine Intelligence Pipeline
-            </h3>
-            <p className="text-xs sm:text-sm text-[#736B5E] mt-2">
-              From raw hydroacoustic transducer frequencies to drone telemetry and automated diver dispatch.
-            </p>
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-black bg-[#FFFF23] text-black uppercase">
+                  INSTRUMENTATION LAB
+                </span>
+                <span className="text-xs font-mono text-stone-400">Proteus AUV-6000 Deep Tow System</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                Interactive 3D Submersible Telemetry
+              </h2>
+              <p className="text-xs sm:text-sm text-stone-400 mt-1 max-w-xl">
+                Inspect physical transducer geometries, hydrodynamic fairings, and edge neural processing enclosures with full 360° mouse-drag and wireframe toggles.
+              </p>
+            </div>
+
+            {/* Spec Filter Pills */}
+            <div className="flex bg-[#141518] p-1 rounded-xl border border-[#25282F] self-start md:self-auto">
+              {(['sonar', 'vision', 'fusion'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setSelectedSpecTab(tab)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                    selectedSpecTab === tab
+                      ? 'bg-[#FFFF23] text-black font-black shadow-xs'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                >
+                  {tab.toUpperCase()} SPEC
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Visual Interactive Flowchart */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* 3D Model Sandbox Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
             
-            {/* Column 1: Sonar Pipeline */}
-            <div className="p-6 rounded-3xl bg-white border border-[#E8E1D5] shadow-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-[#FF6F59]/15 text-[#FF6F59]">
-                  <Radar className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-[#2A2A2A]">1. Hydroacoustic Sonar</h4>
-                  <span className="text-[11px] text-[#736B5E]">Side-Scan Sonar (.SL2, .JSF, .XTF)</span>
-                </div>
-              </div>
-              <ul className="space-y-2 text-xs text-[#5C5449]">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52]" />
-                  <span>Bilateral noise & slant-range correction</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52]" />
-                  <span>Acoustic shadow & highlight segmentation</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52]" />
-                  <span>Random Forest + Sonar-YOLO crab/net classifier</span>
-                </li>
-              </ul>
+            {/* 3D Model Display (8 cols) */}
+            <div className="lg:col-span-8 h-[450px] sm:h-[520px]">
+              <Faux3DMarineModel
+                autoRotate={true}
+                wireframeDefault={false}
+                showControls={true}
+              />
             </div>
 
-            {/* Column 2: Surface Vision */}
-            <div className="p-6 rounded-3xl bg-white border border-[#E8E1D5] shadow-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-[#4F6F52]/15 text-[#4F6F52]">
-                  <Eye className="w-6 h-6" />
+            {/* Specs & Hardware Features (4 cols) */}
+            <div className="lg:col-span-4 space-y-4">
+              
+              {selectedSpecTab === 'sonar' && (
+                <div className="p-6 rounded-3xl bg-[#121316] border border-[#20232A] glass-morph-card space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[#FFFF23]/15 text-[#FFFF23]">
+                      <Radar className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white">Dual-Frequency Transducer</h4>
+                      <p className="text-[11px] font-mono text-stone-400">455 kHz / 900 kHz Chirp</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    Projects high-resolution acoustic acoustic fans up to 120m port and starboard. Penetrates extreme turbidity to extract geometric shadows of abandoned gill nets and traps.
+                  </p>
+                  <div className="pt-2 border-t border-[#20232A] space-y-1.5 text-[11px] font-mono">
+                    <div className="flex justify-between text-stone-400">
+                      <span>Horizontal Beamwidth:</span>
+                      <span className="text-[#FFFF23] font-bold">0.5° Narrow Chirp</span>
+                    </div>
+                    <div className="flex justify-between text-stone-400">
+                      <span>Pulse Compression:</span>
+                      <span className="text-white font-bold">Matched Filter</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-[#2A2A2A]">2. Surface Optical Vision</h4>
-                  <span className="text-[11px] text-[#736B5E]">Drones & Vessel Cameras</span>
-                </div>
-              </div>
-              <ul className="space-y-2 text-xs text-[#5C5449]">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52]" />
-                  <span>YOLOv8-Marine object detection</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52]" />
-                  <span>Multi-frame tracking & velocity vectors</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#4F6F52]" />
-                  <span>Surface polymer slick & line recognition</span>
-                </li>
-              </ul>
-            </div>
+              )}
 
-            {/* Column 3: Fusion & Operations */}
-            <div className="p-6 rounded-3xl bg-white border border-[#E8E1D5] shadow-sm space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-[#2A2A2A] text-white">
-                  <Layers className="w-6 h-6" />
+              {selectedSpecTab === 'vision' && (
+                <div className="p-6 rounded-3xl bg-[#121316] border border-[#20232A] glass-morph-card space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[#2DD4BF]/15 text-[#2DD4BF]">
+                      <Eye className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white">Optical Micro-Gimbal & TPU</h4>
+                      <p className="text-[11px] font-mono text-stone-400">4K HDR @ 120 FPS</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    Integrated edge tensor core running YOLOv8-Marine object detection. Capable of classifying monofilament lines, floating buoys, and derelict ropes in real time.
+                  </p>
+                  <div className="pt-2 border-t border-[#20232A] space-y-1.5 text-[11px] font-mono">
+                    <div className="flex justify-between text-stone-400">
+                      <span>Inference Speed:</span>
+                      <span className="text-[#2DD4BF] font-bold">8.4 ms</span>
+                    </div>
+                    <div className="flex justify-between text-stone-400">
+                      <span>Low-Light Sens:</span>
+                      <span className="text-white font-bold">0.0001 Lux</span>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-sm text-[#2A2A2A]">3. Multimodal Fusion</h4>
-                  <span className="text-[11px] text-[#736B5E]">Spatial-Temporal Graph Engine</span>
+              )}
+
+              {selectedSpecTab === 'fusion' && (
+                <div className="p-6 rounded-3xl bg-[#121316] border border-[#20232A] glass-morph-card space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-white/15 text-[#FFFF23]">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-white">Spatial-Temporal Fusion Engine</h4>
+                      <p className="text-[11px] font-mono text-stone-400">Graph Neural Network</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-stone-300 leading-relaxed">
+                    Combines bathymetric currents, seafloor acoustic highlights, and surface drone sighting coordinates into probabilistic threat matrices for autonomous dispatch.
+                  </p>
+                  <div className="pt-2 border-t border-[#20232A] space-y-1.5 text-[11px] font-mono">
+                    <div className="flex justify-between text-stone-400">
+                      <span>Spatial Index:</span>
+                      <span className="text-[#FFFF23] font-bold">Uber H3 Grid</span>
+                    </div>
+                    <div className="flex justify-between text-stone-400">
+                      <span>Correlation Drift:</span>
+                      <span className="text-white font-bold">&lt; 3.2m Tolerance</span>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* Quick Launch Card */}
+              <div className="p-5 rounded-3xl bg-[#141518] border border-[#25282F] space-y-3">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-[#FFFF23]" />
+                  <span className="text-xs font-bold text-white">Ready for Operations</span>
+                </div>
+                <p className="text-xs text-stone-400 leading-normal">
+                  Access the live dashboard to upload side-scan sonar recordings, evaluate drone images with YOLOv8, or dispatch cleanup missions.
+                </p>
+                <MagneticButton
+                  onClick={onEnterApp}
+                  cursorText="OPEN"
+                  className="w-full py-2.5 rounded-xl bg-[#FFFF23] hover:bg-white text-black text-xs font-black tracking-wide uppercase transition-all shadow-[0_0_15px_rgba(255,255,35,0.3)]"
+                >
+                  Enter Operational Command
+                </MagneticButton>
               </div>
-              <ul className="space-y-2 text-xs text-[#5C5449]">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6F59]" />
-                  <span>Correlates seafloor acoustic shadow + aerial buoy</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6F59]" />
-                  <span>Predicts eddy accumulation & risk scores</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#FF6F59]" />
-                  <span>Automates cleanup taskforce dispatch</span>
-                </li>
-              </ul>
+
             </div>
 
           </div>
@@ -237,18 +322,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
       </section>
 
       {/* Footer */}
-      <footer className="py-12 bg-[#F9F6F0] px-6 lg:px-12 border-t border-[#E8E1D5]">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#736B5E]">
+      <footer className="py-12 bg-[#0C0D0E] px-6 lg:px-12 border-t border-[#20232A] relative z-10">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-400">
           <div className="flex items-center gap-2">
-            <Waves className="w-4 h-4 text-[#FF6F59]" />
-            <span className="font-bold text-[#2A2A2A]">MarineSight AI Marine Intelligence</span>
-            <span>— AI Marine Debris & Underwater Anomaly Platform</span>
+            <span className="font-black text-white">MARINESIGHT AI</span>
+            <span>— Multimodal Acoustic Sonar & Vision Intelligence Platform</span>
           </div>
 
-          <div className="flex items-center gap-4 font-semibold">
-            <button onClick={onEnterApp} className="hover:text-[#FF6F59]">Dashboard</button>
-            <button onClick={() => downloadProjectZip()} className="hover:text-[#FF6F59]">Download ZIP</button>
-            <button onClick={onOpenAuth} className="hover:text-[#FF6F59]">Sign In</button>
+          <div className="flex items-center gap-4 font-mono">
+            <button onClick={onEnterApp} className="hover:text-[#FFFF23] transition-colors">Command Dashboard</button>
+            <button onClick={() => downloadProjectZip()} className="hover:text-[#FFFF23] transition-colors">Download .ZIP</button>
+            <button onClick={onOpenAuth} className="hover:text-[#FFFF23] transition-colors">Authentication</button>
           </div>
         </div>
       </footer>

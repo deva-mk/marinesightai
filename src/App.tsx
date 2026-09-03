@@ -7,6 +7,8 @@ import { SensorSimulatorModal } from './components/common/SensorSimulatorModal';
 import { GhostVisionCopilotModal } from './components/common/GhostVisionCopilotModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { LandingPage } from './components/landing/LandingPage';
+import { CustomCursor } from './components/common/CustomCursor';
+import { HeyneshTicker } from './components/common/HeyneshTicker';
 
 // Feature Views
 import { MainOverviewDashboard } from './features/dashboard/MainOverviewDashboard';
@@ -100,7 +102,9 @@ export const App: React.FC = () => {
   const unreadAlertsCount = alerts.filter(a => !a.acknowledged).length;
 
   return (
-    <div className="min-h-screen bg-[#F9F6F0] text-[#2A2A2A] flex flex-col font-sans selection:bg-[#FF6F59]/20 selection:text-[#2A2A2A]">
+    <div className="min-h-screen bg-[#0C0D0E] text-[#F3F3F3] flex flex-col font-sans selection:bg-[#FFFF23] selection:text-black">
+      {/* Heynesh.com Custom Smooth Magnetic Cursor */}
+      <CustomCursor />
       
       <div className="flex flex-1 relative overflow-hidden">
         
@@ -119,7 +123,7 @@ export const App: React.FC = () => {
         />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
+        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-[#0C0D0E]">
           
           {/* Header */}
           <Header
@@ -132,6 +136,13 @@ export const App: React.FC = () => {
             onOpenAuth={() => setAuthModalOpen(true)}
             onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
             setActiveView={(tab) => handleNavigate(tab)}
+          />
+
+          {/* Heynesh.com Signature Real-Time Marquee Ticker */}
+          <HeyneshTicker
+            detectionsCount={detections.length}
+            incidentsCount={incidents.length}
+            activeMissionsCount={missions.filter(m => m.status === 'ACTIVE').length}
           />
 
           {/* Main View Router */}
