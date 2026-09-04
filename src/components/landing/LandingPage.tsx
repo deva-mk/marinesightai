@@ -6,7 +6,6 @@ import {
   Layers, 
   ArrowRight, 
   CheckCircle2, 
-  Download,
   Sparkles,
   ShieldAlert,
   Ship,
@@ -16,7 +15,6 @@ import {
   Zap,
   RotateCcw
 } from 'lucide-react';
-import { downloadProjectZip } from '../../services/zipExport';
 import { ScrollytellingSection } from './ScrollytellingSection';
 import { MagneticButton } from '../common/MagneticButton';
 import { AnimatedLogo } from '../common/AnimatedLogo';
@@ -24,6 +22,8 @@ import { AmbientGradients } from '../common/AmbientGradients';
 import { CustomCursor } from '../common/CustomCursor';
 import { HeyneshTicker } from '../common/HeyneshTicker';
 import { Faux3DMarineModel } from '../common/Faux3DMarineModel';
+import { LiveWallpaper } from '../common/LiveWallpaper';
+import { LiveWallpaperSelector } from '../common/LiveWallpaperSelector';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -34,7 +34,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
   const [selectedSpecTab, setSelectedSpecTab] = useState<'sonar' | 'vision' | 'fusion'>('sonar');
 
   return (
-    <div className="min-h-screen bg-[#0C0D0E] text-[#F3F3F3] relative selection:bg-[#FFFF23] selection:text-black">
+    <div className="min-h-screen bg-[#0C0D0E]/90 text-[#F3F3F3] relative selection:bg-[#FFFF23] selection:text-black">
+      {/* 60FPS Live Ocean Wallpaper Background */}
+      <LiveWallpaper />
+
       {/* Magnetic Cursor */}
       <CustomCursor />
 
@@ -50,14 +53,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
 
           {/* Nav Actions */}
           <div className="flex items-center gap-3">
-            <MagneticButton
-              onClick={() => downloadProjectZip()}
-              cursorText="ZIP"
-              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#141518] hover:bg-[#1A1C22] border border-[#25282F] text-xs font-bold text-stone-300 hover:text-white transition-all"
-            >
-              <Download className="w-3.5 h-3.5 text-[#FFFF23]" />
-              <span>Download Project ZIP</span>
-            </MagneticButton>
+            <LiveWallpaperSelector />
 
             <MagneticButton
               onClick={onOpenAuth}
@@ -331,7 +327,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
 
           <div className="flex items-center gap-4 font-mono">
             <button onClick={onEnterApp} className="hover:text-[#FFFF23] transition-colors">Command Dashboard</button>
-            <button onClick={() => downloadProjectZip()} className="hover:text-[#FFFF23] transition-colors">Download .ZIP</button>
             <button onClick={onOpenAuth} className="hover:text-[#FFFF23] transition-colors">Authentication</button>
           </div>
         </div>

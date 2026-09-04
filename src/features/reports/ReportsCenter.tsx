@@ -8,11 +8,9 @@ import {
   Sparkles, 
   ShieldCheck,
   FileSpreadsheet,
-  FileCode,
-  Archive
+  FileCode
 } from 'lucide-react';
 import { DetectionRecord, IncidentRecord, CleanupMission } from '../../types';
-import { downloadProjectZip } from '../../services/zipExport';
 
 interface ReportsCenterProps {
   detections?: DetectionRecord[];
@@ -118,14 +116,6 @@ export const ReportsCenter: React.FC<ReportsCenterProps> = ({
           >
             <FileCode className="w-4 h-4 text-[#FF6F59]" />
             <span>Export JSON</span>
-          </button>
-
-          <button
-            onClick={() => downloadProjectZip()}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#4F6F52] hover:bg-[#3E5841] text-white text-xs font-bold transition-all shadow-xs"
-          >
-            <Archive className="w-4 h-4" />
-            <span>Full Project ZIP</span>
           </button>
 
           <button

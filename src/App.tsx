@@ -9,6 +9,7 @@ import { AuthModal } from './components/auth/AuthModal';
 import { LandingPage } from './components/landing/LandingPage';
 import { CustomCursor } from './components/common/CustomCursor';
 import { HeyneshTicker } from './components/common/HeyneshTicker';
+import { LiveWallpaper } from './components/common/LiveWallpaper';
 
 // Feature Views
 import { MainOverviewDashboard } from './features/dashboard/MainOverviewDashboard';
@@ -92,21 +93,27 @@ export const App: React.FC = () => {
 
   if (isLanding) {
     return (
-      <LandingPage
-        onEnterApp={() => setIsLanding(false)}
-        onOpenAuth={() => setAuthModalOpen(true)}
-      />
+      <div className="relative min-h-screen bg-[#0C0D0E]">
+        <LiveWallpaper />
+        <LandingPage
+          onEnterApp={() => setIsLanding(false)}
+          onOpenAuth={() => setAuthModalOpen(true)}
+        />
+      </div>
     );
   }
 
   const unreadAlertsCount = alerts.filter(a => !a.acknowledged).length;
 
   return (
-    <div className="min-h-screen bg-[#0C0D0E] text-[#F3F3F3] flex flex-col font-sans selection:bg-[#FFFF23] selection:text-black">
+    <div className="min-h-screen bg-[#0C0D0E] text-[#F3F3F3] flex flex-col font-sans selection:bg-[#FFFF23] selection:text-black relative">
+      {/* 60FPS Live Ocean Wallpaper Background */}
+      <LiveWallpaper />
+
       {/* Heynesh.com Custom Smooth Magnetic Cursor */}
       <CustomCursor />
       
-      <div className="flex flex-1 relative overflow-hidden">
+      <div className="flex flex-1 relative overflow-hidden z-10">
         
         {/* Responsive Navigation Sidebar */}
         <Sidebar
@@ -123,7 +130,7 @@ export const App: React.FC = () => {
         />
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-[#0C0D0E]">
+        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-[#0C0D0E]/85 backdrop-blur-[1.5px]">
           
           {/* Header */}
           <Header

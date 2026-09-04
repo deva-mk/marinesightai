@@ -5,7 +5,6 @@ import {
   Bell, 
   Bot, 
   Radio, 
-  Download, 
   Trash2,
   RotateCcw, 
   ShieldCheck, 
@@ -24,7 +23,7 @@ import {
 } from 'lucide-react';
 import { marineStorage, DEFAULT_ACCOUNTS } from '../../services/storage';
 import { UserProfile, UserRole } from '../../types';
-import { downloadProjectZip } from '../../services/zipExport';
+import { LiveWallpaperSelector } from './LiveWallpaperSelector';
 import confetti from 'canvas-confetti';
 
 interface HeaderProps {
@@ -58,26 +57,11 @@ export const Header: React.FC<HeaderProps> = ({
   const alertsCount = unreadAlertsCount ?? unreadCount ?? 0;
   const toggleMobile = onToggleSidebarMobile || onToggleMobileMenu;
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
-  const [isExportingZip, setIsExportingZip] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   
   const isLoggedIn = marineStorage.isLoggedIn() && currentUser.email !== 'guest@marinesight.public';
-
-  const handleDownloadZip = async () => {
-    try {
-      setIsExportingZip(true);
-      await downloadProjectZip();
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.1 } });
-      setToastMsg("MarineSight AI Full Project ZIP Downloaded Successfully!");
-      setTimeout(() => setToastMsg(null), 4000);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsExportingZip(false);
-    }
-  };
 
   const handleClearAllData = () => {
     if (confirm("Remove all detections, incidents, missions, and alerts to start with 0 predefined records?")) {
@@ -211,16 +195,8 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden xl:inline">Clear Data</span>
           </button>
 
-          {/* Download Project ZIP */}
-          <button
-            onClick={handleDownloadZip}
-            disabled={isExportingZip}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFFF23] hover:bg-white text-black text-xs font-extrabold tracking-wide transition-all shadow-[0_0_15px_rgba(255,255,35,0.3)] group"
-            title="Download Complete Project as ZIP file"
-          >
-            <Download className={`w-3.5 h-3.5 ${isExportingZip ? 'animate-bounce' : 'group-hover:-translate-y-0.5'} transition-transform`} />
-            <span className="hidden lg:inline">{isExportingZip ? 'Packing...' : 'ZIP'}</span>
-          </button>
+          {/* Live Wallpaper Background Selector */}
+          <LiveWallpaperSelector />
 
           {/* Notifications */}
           <button
