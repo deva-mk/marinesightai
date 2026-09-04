@@ -235,7 +235,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'datasets' && (
-              <DatasetLab />
+              <DatasetLab onNavigate={handleNavigate} />
             )}
 
             {activeTab === 'analytics' && (

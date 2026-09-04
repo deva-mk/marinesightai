@@ -542,6 +542,73 @@ class MarineStorageService {
     }
   }
 
+  public saveDatasets(datasets: DatasetRecord[]) {
+    localStorage.setItem(STORAGE_KEYS.DATASETS, JSON.stringify(datasets));
+    this.notifyListeners();
+  }
+
+  public addDataset(dataset: DatasetRecord): DatasetRecord {
+    const list = this.getDatasets();
+    const updated = [dataset, ...list];
+    this.saveDatasets(updated);
+    return dataset;
+  }
+
+  public addDatasetBatch(
+    datasetId: string, 
+    batchData: {
+      batchName: string;
+      sampleCount: number;
+      annotationsCount: number;
+      format: string;
+      classes: string[];
+      sensorType: string;
+      notes?: string;
+    }
+  ): DatasetRecord {
+    const list = this.getDatasets();
+    const existing = list.find(d => d.id === datasetId);
+    if (existing) {
+      const updatedList = list.map(d => {
+        if (d.id === datasetId) {
+          const newFormats = Array.from(new Set([...(d.formats || []), batchData.format]));
+          return {
+            ...d,
+            imagesCount: (d.imagesCount || 0) + batchData.sampleCount,
+            annotationsCount: (d.annotationsCount || 0) + batchData.annotationsCount,
+            classesCount: Math.max(d.classesCount || 0, batchData.classes.length),
+            lastUpdated: new Date().toISOString().split('T')[0],
+            formats: newFormats
+          };
+        }
+        return d;
+      });
+      this.saveDatasets(updatedList);
+      return updatedList.find(d => d.id === datasetId)!;
+    } else {
+      const newDs: DatasetRecord = {
+        id: datasetId,
+        name: batchData.batchName,
+        version: 'v1.0',
+        type: (batchData.sensorType.includes('SONAR') 
+          ? 'SONAR_ACOUSTIC' 
+          : batchData.sensorType.includes('SURFACE') 
+            ? 'SURFACE_AERIAL' 
+            : 'UNDERWATER_OPTICAL') as any,
+        imagesCount: batchData.sampleCount,
+        annotationsCount: batchData.annotationsCount,
+        classesCount: batchData.classes.length || 5,
+        trainValTestSplit: '70% / 15% / 15%',
+        qualityScore: 95,
+        lastUpdated: new Date().toISOString().split('T')[0],
+        formats: [batchData.format]
+      };
+      const updated = [newDs, ...list];
+      this.saveDatasets(updated);
+      return newDs;
+    }
+  }
+
   // --- Alerts ---
   public getAlerts(): AlertRecord[] {
     try {
@@ -667,3 +734,4 @@ class MarineStorageService {
 }
 
 export const marineStorage = new MarineStorageService();
+export const storageService = marineStorage;

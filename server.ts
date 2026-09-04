@@ -4,7 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -1490,6 +1490,178 @@ app.post('/api/cleanup/dispatch', (req, res) => {
   };
   inMemoryCleanupOps.unshift(newOp);
   res.json(newOp);
+});
+
+// 9. Marine Dataset Lab API & Batch Ingestion
+const inMemoryDatasets = [
+  {
+    id: 'DS-01',
+    name: 'Global Side-Scan Sonar Marine Debris Benchmark',
+    version: 'v3.2',
+    type: 'SONAR_ACOUSTIC',
+    imagesCount: 18400,
+    annotationsCount: 42100,
+    classesCount: 6,
+    trainValTestSplit: '70% / 15% / 15%',
+    qualityScore: 94,
+    lastUpdated: '2026-08-15',
+    formats: ['.PNG', '.XTF', '.JSF', '.DAT', '.SL2'],
+    classes: ['Ghost Net', 'Crab Pot', 'Tire', 'Metal Drum', 'Coral Pinnacle', 'Derelict Line'],
+    description: 'High-frequency hydroacoustic side-scan transects containing ghost gear, crab pots, and seabed anomalies in Gulf of Mannar & Palk Bay.',
+    batchesCount: 14,
+    recentBatches: [
+      { batchId: 'BATCH-2026-08-04', name: 'Palk Bay High-Chirp 900kHz Transects', samples: 1200, format: 'COCO + XTF', uploadedAt: '2026-08-15' },
+      { batchId: 'BATCH-2026-07-22', name: 'Mannar Coral Ridge Towfish Sweep', samples: 1850, format: 'SL2 Binary', uploadedAt: '2026-07-22' }
+    ]
+  },
+  {
+    id: 'DS-02',
+    name: 'Aerial Drone Marine Litter Optical & Multispectral',
+    version: 'v4.0',
+    type: 'SURFACE_AERIAL',
+    imagesCount: 24500,
+    annotationsCount: 68900,
+    classesCount: 12,
+    trainValTestSplit: '75% / 15% / 10%',
+    qualityScore: 96,
+    lastUpdated: '2026-08-20',
+    formats: ['.JPG', '.MP4', '.GeoTIFF', 'YOLOv9 .txt'],
+    classes: ['Plastic Matrix', 'Net Buoy', 'Mooring Rope', 'Polymer Slick', 'Foam Float', 'Microplastic Gyre'],
+    description: 'RGB and 850nm NIR UAV imagery capturing floating plastic debris, nets, ropes, and buoys.',
+    batchesCount: 22,
+    recentBatches: [
+      { batchId: 'BATCH-2026-08-19', name: 'Coastal Drone Patrol #08 RGB High-Res', samples: 2100, format: 'YOLO Darknet', uploadedAt: '2026-08-20' }
+    ]
+  },
+  {
+    id: 'DS-03',
+    name: 'Benthic Reef Underwater ROV Entanglement Imagery',
+    version: 'v2.1',
+    type: 'UNDERWATER_OPTICAL',
+    imagesCount: 9200,
+    annotationsCount: 21400,
+    classesCount: 8,
+    trainValTestSplit: '70% / 20% / 10%',
+    qualityScore: 91,
+    lastUpdated: '2026-07-28',
+    formats: ['.JPG', '.PNG', '.RAW'],
+    classes: ['Entangled Reef', 'Ghost Webbing Array', 'Sunken Line Cluster', 'Anchor Chain Debris'],
+    description: 'Benthic macro and wide-angle ROV video frames of seabed entanglement and ghost gear smothering.',
+    batchesCount: 9,
+    recentBatches: [
+      { batchId: 'BATCH-2026-07-28', name: 'Deep Reef Salvage Dive Optical 4K', samples: 850, format: 'Pascal VOC XML', uploadedAt: '2026-07-28' }
+    ]
+  },
+  {
+    id: 'DS-04',
+    name: 'Multimodal Paired Acoustic-Optical Co-Registrations',
+    version: 'v1.8',
+    type: 'SONAR_ACOUSTIC',
+    imagesCount: 6800,
+    annotationsCount: 19500,
+    classesCount: 5,
+    trainValTestSplit: '80% / 10% / 10%',
+    qualityScore: 98,
+    lastUpdated: '2026-08-10',
+    formats: ['.JSON', '.XTF', '.GeoJSON'],
+    classes: ['Co-Registered Net Mass', 'Acoustic Shadow & Surface Buoy Pair', 'Polymer Webbing'],
+    description: 'Spatially synchronized side-scan sonar and drone aerial observations of submerged debris sites.',
+    batchesCount: 6,
+    recentBatches: [
+      { batchId: 'BATCH-2026-08-09', name: 'Synchronized AUV & UAV Palk Strait Sweep', samples: 600, format: 'GeoJSON + XTF', uploadedAt: '2026-08-10' }
+    ]
+  }
+];
+
+app.get('/api/datasets', (req, res) => {
+  res.json({ success: true, datasets: inMemoryDatasets });
+});
+
+app.post('/api/datasets/upload-batch', (req, res) => {
+  try {
+    const {
+      datasetId,
+      batchName = `BATCH-${Date.now().toString().slice(-4)}`,
+      sensorType = 'SONAR_ACOUSTIC',
+      format = 'COCO JSON',
+      sampleCount = 240,
+      annotationsCount = 580,
+      classes = ['Ghost Net', 'Plastic Debris'],
+      splitRatio = '70% / 15% / 15%',
+      filenames = [],
+      notes = ''
+    } = req.body;
+
+    let target = inMemoryDatasets.find(d => d.id === datasetId);
+
+    if (target) {
+      target.imagesCount += Number(sampleCount) || 100;
+      target.annotationsCount += Number(annotationsCount) || 250;
+      target.lastUpdated = new Date().toISOString().split('T')[0];
+      target.batchesCount = (target.batchesCount || 0) + 1;
+      if (!target.formats.includes(format)) {
+        target.formats.push(format);
+      }
+      classes.forEach((c: string) => {
+        if (!target?.classes?.includes(c)) {
+          target?.classes?.push(c);
+        }
+      });
+      target.recentBatches.unshift({
+        batchId: `BATCH-${Date.now().toString().slice(-6)}`,
+        name: batchName,
+        samples: Number(sampleCount) || 100,
+        format,
+        uploadedAt: new Date().toISOString().split('T')[0]
+      });
+    } else {
+      // Create new dataset
+      const newId = datasetId || `DS-0${inMemoryDatasets.length + 1}`;
+      target = {
+        id: newId,
+        name: batchName,
+        version: 'v1.0',
+        type: sensorType as any,
+        imagesCount: Number(sampleCount) || 100,
+        annotationsCount: Number(annotationsCount) || 250,
+        classesCount: classes.length || 5,
+        trainValTestSplit: splitRatio || '70% / 15% / 15%',
+        qualityScore: 95,
+        lastUpdated: new Date().toISOString().split('T')[0],
+        formats: [format],
+        classes: classes.length ? classes : ['Ghost Net', 'Marine Plastic', 'Derelict Gear'],
+        description: `Ingested training corpus from ${batchName} (${sensorType}).`,
+        batchesCount: 1,
+        recentBatches: [
+          {
+            batchId: `BATCH-${Date.now().toString().slice(-6)}`,
+            name: batchName,
+            samples: Number(sampleCount) || 100,
+            format,
+            uploadedAt: new Date().toISOString().split('T')[0]
+          }
+        ]
+      };
+      inMemoryDatasets.unshift(target);
+    }
+
+    res.json({
+      success: true,
+      message: `Successfully ingested batch "${batchName}" into dataset [${target.id}]. Added ${sampleCount} samples and ${annotationsCount} annotations.`,
+      dataset: target,
+      batchSummary: {
+        batchName,
+        datasetId: target.id,
+        filesProcessed: filenames.length || sampleCount,
+        sensorType,
+        format,
+        newTotalSamples: target.imagesCount,
+        newTotalAnnotations: target.annotationsCount
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 

@@ -214,6 +214,34 @@ export const apiService = {
     return await res.json();
   },
 
+  // Dataset Lab APIs
+  getDatasets: async () => {
+    const res = await fetch('/api/datasets');
+    if (!res.ok) throw new Error(`Datasets API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  uploadDatasetBatch: async (payload: {
+    datasetId: string;
+    batchName: string;
+    sensorType: string;
+    format: string;
+    sampleCount: number;
+    annotationsCount: number;
+    classes: string[];
+    splitRatio?: string;
+    filenames?: string[];
+    notes?: string;
+  }) => {
+    const res = await fetch('/api/datasets/upload-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Dataset Batch Upload error: ${res.statusText}`);
+    return await res.json();
+  },
+
   // Unified Detections API
   getDetections: async (modality?: string) => {
     const url = modality ? `/api/detections?modality=${encodeURIComponent(modality)}` : '/api/detections';
