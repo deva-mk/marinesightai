@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Sidebar Container in Heynesh style */}
       <aside className={`
-        fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#0C0D0E] border-r border-[#20232A] flex flex-col transition-transform duration-200 ease-in-out text-white select-none
+        fixed top-0 bottom-0 left-0 z-40 w-64 bg-[#0C0D0E]/80 backdrop-blur-xl border-r border-[#20232A]/70 flex flex-col transition-transform duration-200 ease-in-out text-white select-none
         lg:static lg:translate-x-0
         ${isMobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
       `}>

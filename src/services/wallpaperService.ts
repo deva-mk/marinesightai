@@ -4,7 +4,7 @@ export type WallpaperTheme =
   | 'NEURAL_SENSOR_MESH' 
   | 'OCEANIC_CAUSTICS_WAVES';
 
-export type WallpaperIntensity = 'subtle' | 'vibrant' | 'stealth';
+export type WallpaperIntensity = 'subtle' | 'vibrant' | 'ultra';
 
 export interface WallpaperConfig {
   theme: WallpaperTheme;
@@ -12,6 +12,8 @@ export interface WallpaperConfig {
   enabled: boolean;
   interactiveMouse: boolean;
   speed: number; // 0.5 to 2.0
+  opacity: number; // 0.3 to 1.0
+  showcaseMode: boolean; // Fullscreen cinematic viewer
 }
 
 const STORAGE_KEY = 'ms_live_wallpaper_config';
@@ -69,6 +71,8 @@ const DEFAULT_CONFIG: WallpaperConfig = {
   enabled: true,
   interactiveMouse: true,
   speed: 1.0,
+  opacity: 0.95,
+  showcaseMode: false,
 };
 
 type Listener = (config: WallpaperConfig) => void;
@@ -79,7 +83,14 @@ export const wallpaperService = {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+        const parsed = JSON.parse(stored);
+        // Ensure enabled defaults to true if undefined or corrupted
+        return { 
+          ...DEFAULT_CONFIG, 
+          ...parsed, 
+          enabled: parsed.enabled !== undefined ? parsed.enabled : true,
+          showcaseMode: false // always start non-fullscreen
+        };
       }
     } catch {
       // fallback
@@ -105,6 +116,14 @@ export const wallpaperService = {
 
   setIntensity(intensity: WallpaperIntensity) {
     return this.setConfig({ intensity });
+  },
+
+  setOpacity(opacity: number) {
+    return this.setConfig({ opacity: Math.max(0.2, Math.min(1.0, opacity)) });
+  },
+
+  setShowcaseMode(showcaseMode: boolean) {
+    return this.setConfig({ showcaseMode });
   },
 
   toggleEnabled() {

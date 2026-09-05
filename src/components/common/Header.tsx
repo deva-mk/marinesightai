@@ -100,7 +100,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[#0C0D0E]/95 backdrop-blur-md border-b border-[#20232A] px-4 lg:px-8 py-2.5 transition-all text-white">
+    <header className="sticky top-0 z-30 bg-[#0C0D0E]/75 backdrop-blur-xl border-b border-[#20232A]/80 px-4 lg:px-8 py-2.5 transition-all text-white">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
         {/* Left: Mobile Menu & Logo */}

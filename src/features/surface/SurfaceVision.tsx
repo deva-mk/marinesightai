@@ -515,7 +515,7 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
                 className="w-full p-2 bg-[#F9F6F0] border border-[#E8E1D5] rounded-xl text-xs font-bold text-[#2A2A2A] focus:outline-hidden"
               >
                 <option value="tfjs-mobilenet">TensorFlow.js Edge (MobileNet-v2 COCO-SSD, Sub-15ms)</option>
-                <option value="gemini-multimodal">Gemini 3.7 Flash Vision API (Zero-Shot Multimodal)</option>
+                <option value="gemini-multimodal">Gemini 3.8 Flash Vision API (Zero-Shot Multimodal)</option>
                 <option value="yolo-v9-marine">YOLOv9-SeaGuard Spec (ONNX / TensorRT Target Format)</option>
               </select>
             </div>

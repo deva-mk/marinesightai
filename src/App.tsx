@@ -129,8 +129,8 @@ export const App: React.FC = () => {
           userRole={currentUser.role}
         />
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-[#0C0D0E]/85 backdrop-blur-[1.5px]">
+        {/* Main Content Area with translucent glass so Live Wallpaper shines through */}
+        <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto bg-[#0C0D0E]/40 backdrop-blur-xs">
           
           {/* Header */}
           <Header

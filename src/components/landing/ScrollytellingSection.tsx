@@ -151,7 +151,7 @@ export const ScrollytellingSection: React.FC<ScrollytellingSectionProps> = ({ on
   return (
     <div 
       ref={containerRef}
-      className="relative w-full bg-[#0C0D0E] text-white"
+      className="relative w-full bg-[#0C0D0E]/60 backdrop-blur-xs text-white"
       style={{ height: '360vh' }} // 3.6x screen height gives generous scroll runway for pinned scrollytelling
     >
       

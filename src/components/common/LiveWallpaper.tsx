@@ -1,5 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { wallpaperService, WallpaperConfig, WallpaperTheme } from '../../services/wallpaperService';
+import { 
+  wallpaperService, 
+  WallpaperConfig, 
+  WallpaperTheme, 
+  WALLPAPER_THEMES 
+} from '../../services/wallpaperService';
+import { 
+  Radar, 
+  Sparkles, 
+  Cpu, 
+  Waves, 
+  X, 
+  Maximize2, 
+  Radio, 
+  Eye, 
+  Compass,
+  Sliders,
+  Volume2,
+  Check
+} from 'lucide-react';
 
 interface LiveWallpaperProps {
   className?: string;
@@ -50,11 +69,20 @@ interface SignalPacket {
 export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [config, setConfig] = useState<WallpaperConfig>(() => wallpaperService.getConfig());
-  const mouseRef = useRef<{ x: number; y: number; active: boolean; clickRipple: { x: number; y: number; r: number; alpha: number } | null }>({
+  const [fps, setFps] = useState<number>(60);
+  
+  const mouseRef = useRef<{ 
+    x: number; 
+    y: number; 
+    active: boolean; 
+    clickRipple: { x: number; y: number; r: number; alpha: number } | null;
+    trail: { x: number; y: number; alpha: number }[];
+  }>({
     x: -1000,
     y: -1000,
     active: false,
     clickRipple: null,
+    trail: [],
   });
 
   // Subscribe to wallpaper service changes
@@ -63,6 +91,17 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
       setConfig(newConfig);
     });
   }, []);
+
+  // Handle ESC key to exit showcase mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && config.showcaseMode) {
+        wallpaperService.setShowcaseMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [config.showcaseMode]);
 
   // Main animation canvas loop
   useEffect(() => {
@@ -103,6 +142,9 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
       mouseRef.current.active = true;
+      if (mouseRef.current.trail.length < 15) {
+        mouseRef.current.trail.push({ x: e.clientX, y: e.clientY, alpha: 0.8 });
+      }
     };
 
     const handleMouseLeave = () => {
@@ -115,7 +157,7 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
       mouseRef.current.clickRipple = {
         x: e.clientX,
         y: e.clientY,
-        r: 5,
+        r: 8,
         alpha: 1.0,
       };
     };
@@ -124,196 +166,235 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
     window.addEventListener('mouseleave', handleMouseLeave);
     window.addEventListener('click', handleClick);
 
-    // Global intensity multiplier
-    const intensityFactor = config.intensity === 'vibrant' ? 1.0 : config.intensity === 'subtle' ? 0.6 : 0.35;
+    // Dynamic contrast & brightness factor
+    const intensityFactor = config.intensity === 'ultra' ? 1.4 : config.intensity === 'vibrant' ? 1.15 : 0.85;
     const speedMultiplier = config.speed || 1.0;
 
     // --- State for SONAR_SWEEP ---
     let sonarAngle = 0;
-    const sonarCenter = { x: width * 0.5, y: height * 0.48 };
-    const sonarMaxRadius = Math.max(width, height) * 0.7;
     const sonarTargets: SonarTarget[] = [
-      { x: sonarCenter.x + 180, y: sonarCenter.y - 120, size: 5, label: 'Ghost Net Mass #04', depth: '18.4m', detectedTime: 0, echoRadius: 0 },
-      { x: sonarCenter.x - 240, y: sonarCenter.y + 140, size: 4, label: 'Submerged Crab Pot Array', depth: '24.1m', detectedTime: 0, echoRadius: 0 },
-      { x: sonarCenter.x + 320, y: sonarCenter.y + 200, size: 6, label: 'Derelict Mooring Cable', depth: '31.2m', detectedTime: 0, echoRadius: 0 },
-      { x: sonarCenter.x - 160, y: sonarCenter.y - 220, size: 4, label: 'Acoustic Shadow Anomaly', depth: '14.8m', detectedTime: 0, echoRadius: 0 },
-      { x: sonarCenter.x + 80, y: sonarCenter.y + 280, size: 5, label: 'Benthic Entanglement Cluster', depth: '38.5m', detectedTime: 0, echoRadius: 0 },
-      { x: sonarCenter.x - 380, y: sonarCenter.y - 60, size: 4, label: 'Hydrophone Beacon P-09', depth: '12.0m', detectedTime: 0, echoRadius: 0 },
+      { x: width * 0.65, y: height * 0.35, size: 7, label: 'Ghost Net Mass #04', depth: '18.4m', detectedTime: 0, echoRadius: 0 },
+      { x: width * 0.32, y: height * 0.68, size: 6, label: 'Submerged Crab Trap Line', depth: '24.1m', detectedTime: 0, echoRadius: 0 },
+      { x: width * 0.78, y: height * 0.72, size: 8, label: 'Derelict Mooring Cable', depth: '31.2m', detectedTime: 0, echoRadius: 0 },
+      { x: width * 0.28, y: height * 0.26, size: 6, label: 'Synthetic Polymer Drift', depth: '14.8m', detectedTime: 0, echoRadius: 0 },
+      { x: width * 0.52, y: height * 0.82, size: 7, label: 'Benthic Debris Cluster', depth: '38.5m', detectedTime: 0, echoRadius: 0 },
+      { x: width * 0.18, y: height * 0.45, size: 5, label: 'Acoustic Transponder P-9', depth: '12.0m', detectedTime: 0, echoRadius: 0 },
     ];
 
     // --- State for BIOLUMINESCENT_ABYSS ---
     const bioParticles: Particle[] = [];
-    const bioColors = ['#2DD4BF', '#38BDF8', '#FFFF23', '#818CF8', '#34D399'];
-    for (let i = 0; i < 70; i++) {
+    const bioColors = ['#2DD4BF', '#38BDF8', '#FFFF23', '#818CF8', '#34D399', '#F472B6'];
+    for (let i = 0; i < 85; i++) {
       bioParticles.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: -0.15 - Math.random() * 0.35, // slow upward drift (planktonic current)
-        size: 1.5 + Math.random() * 3.5,
-        originalSize: 1.5 + Math.random() * 3.5,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: -0.2 - Math.random() * 0.45, // upward pelagic drift
+        size: 2.5 + Math.random() * 4.5,
+        originalSize: 2.5 + Math.random() * 4.5,
         color: bioColors[Math.floor(Math.random() * bioColors.length)],
-        alpha: 0.2 + Math.random() * 0.6,
+        alpha: 0.4 + Math.random() * 0.5,
         pulsePhase: Math.random() * Math.PI * 2,
-        pulseSpeed: 0.015 + Math.random() * 0.025,
+        pulseSpeed: 0.02 + Math.random() * 0.03,
       });
     }
 
     // --- State for NEURAL_SENSOR_MESH ---
     const meshNodes: MeshNode[] = [];
-    for (let i = 0; i < 42; i++) {
+    for (let i = 0; i < 46; i++) {
       meshNodes.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 0.6,
-        vy: (Math.random() - 0.5) * 0.6,
-        radius: i % 7 === 0 ? 4.5 : 2.5,
-        id: `N-${i + 1}`,
-        isHub: i % 7 === 0,
+        vx: (Math.random() - 0.5) * 0.7,
+        vy: (Math.random() - 0.5) * 0.7,
+        radius: i % 6 === 0 ? 5.5 : 3.0,
+        id: i % 6 === 0 ? `HUB-${Math.floor(i / 6) + 1}` : `S-${i + 1}`,
+        isHub: i % 6 === 0,
         pulse: Math.random() * Math.PI,
       });
     }
 
     const packets: SignalPacket[] = [];
-    const spawnPacket = () => {
-      if (meshNodes.length < 2) return;
+    for (let i = 0; i < 12; i++) {
       const from = Math.floor(Math.random() * meshNodes.length);
       let to = Math.floor(Math.random() * meshNodes.length);
       while (to === from) to = Math.floor(Math.random() * meshNodes.length);
       packets.push({
         fromNode: from,
         toNode: to,
-        progress: 0,
-        speed: 0.008 + Math.random() * 0.015,
+        progress: Math.random(),
+        speed: 0.01 + Math.random() * 0.015,
         color: Math.random() > 0.4 ? '#2DD4BF' : '#FFFF23',
       });
-    };
-
-    for (let i = 0; i < 8; i++) spawnPacket();
+    }
 
     // --- State for OCEANIC_CAUSTICS_WAVES ---
     let waveTime = 0;
+    const bubbles: { x: number; y: number; r: number; vy: number; alpha: number }[] = [];
+    for (let i = 0; i < 35; i++) {
+      bubbles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        r: 1.5 + Math.random() * 3.5,
+        vy: 0.4 + Math.random() * 0.8,
+        alpha: 0.2 + Math.random() * 0.6,
+      });
+    }
+
+    // FPS counter
+    let lastFrameTime = performance.now();
+    let frameCount = 0;
 
     // --- RENDER FUNCTIONS ---
 
     // 1. SONAR SWEEP RENDERER
-    const renderSonar = (time: number) => {
-      sonarCenter.x = width * 0.5;
-      sonarCenter.y = height * 0.48;
+    const renderSonar = () => {
+      const sonarCenter = { x: width * 0.5, y: height * 0.48 };
+      const sonarMaxRadius = Math.max(width, height) * 0.75;
 
-      sonarAngle = (sonarAngle + 0.012 * speedMultiplier) % (Math.PI * 2);
-
-      // Radar Concentric Range Rings
-      const ringDistances = [120, 240, 360, 500, 680];
-      const ringLabels = ['100m', '250m', '500m', '750m', '1000m'];
+      sonarAngle = (sonarAngle + 0.014 * speedMultiplier) % (Math.PI * 2);
 
       ctx.save();
-      ctx.lineWidth = 1;
 
-      // Range rings
+      // Atmospheric Deep Sea Blue/Cyan glow in center
+      const centerGlow = ctx.createRadialGradient(sonarCenter.x, sonarCenter.y, 10, sonarCenter.x, sonarCenter.y, sonarMaxRadius * 0.65);
+      centerGlow.addColorStop(0, `rgba(13, 148, 136, ${0.12 * intensityFactor})`);
+      centerGlow.addColorStop(0.5, `rgba(15, 23, 42, ${0.05 * intensityFactor})`);
+      centerGlow.addColorStop(1, 'transparent');
+      ctx.fillStyle = centerGlow;
+      ctx.fillRect(0, 0, width, height);
+
+      // Radar Concentric Range Rings
+      const ringDistances = [100, 220, 360, 520, 700, 920];
+      const ringLabels = ['100m', '250m', '500m', '750m', '1000m', '1500m'];
+
       ringDistances.forEach((r, idx) => {
+        // Main Ring Line
         ctx.beginPath();
         ctx.arc(sonarCenter.x, sonarCenter.y, r, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(45, 212, 191, ${0.08 * intensityFactor})`;
+        ctx.strokeStyle = `rgba(45, 212, 191, ${0.28 * intensityFactor})`;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Dashed sub-ring
-        ctx.beginPath();
-        ctx.setLineDash([4, 12]);
-        ctx.arc(sonarCenter.x, sonarCenter.y, r - 60, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 255, 35, ${0.04 * intensityFactor})`;
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Dashed Sub-Ring
+        if (r > 100) {
+          ctx.beginPath();
+          ctx.setLineDash([4, 10]);
+          ctx.arc(sonarCenter.x, sonarCenter.y, r - (ringDistances[idx] - (ringDistances[idx - 1] || 0)) / 2, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 255, 35, ${0.18 * intensityFactor})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
 
-        // Nautical Distance Label
-        ctx.font = '9px monospace';
-        ctx.fillStyle = `rgba(45, 212, 191, ${0.3 * intensityFactor})`;
-        ctx.fillText(ringLabels[idx], sonarCenter.x + r - 35, sonarCenter.y - 6);
+        // Distance Tag in Monospace
+        ctx.font = 'bold 11px monospace';
+        ctx.fillStyle = `rgba(45, 212, 191, ${0.75 * intensityFactor})`;
+        ctx.fillText(`▲ ${ringLabels[idx]} RANGE`, sonarCenter.x + r - 48, sonarCenter.y - 8);
       });
 
-      // Crosshairs & Bearing rays
-      const angles = [0, Math.PI * 0.25, Math.PI * 0.5, Math.PI * 0.75, Math.PI, Math.PI * 1.25, Math.PI * 1.5, Math.PI * 1.75];
-      angles.forEach((ang) => {
+      // Bearing Rays & Angle Markings
+      const angleCount = 12;
+      for (let i = 0; i < angleCount; i++) {
+        const ang = (i / angleCount) * Math.PI * 2;
+        const deg = Math.round((ang * 180) / Math.PI);
+
         ctx.beginPath();
         ctx.moveTo(sonarCenter.x, sonarCenter.y);
         ctx.lineTo(sonarCenter.x + Math.cos(ang) * sonarMaxRadius, sonarCenter.y + Math.sin(ang) * sonarMaxRadius);
-        ctx.strokeStyle = `rgba(45, 212, 191, ${0.06 * intensityFactor})`;
+        ctx.strokeStyle = `rgba(45, 212, 191, ${0.2 * intensityFactor})`;
+        ctx.lineWidth = 1;
         ctx.stroke();
-      });
 
-      // Rotating Acoustic Sweep Beam with Phosphor Gradient Fan
-      const sweepSpan = Math.PI * 0.35; // 63 degree wedge
-      const steps = 32;
+        // Degree label at periphery
+        const lx = sonarCenter.x + Math.cos(ang) * 420;
+        const ly = sonarCenter.y + Math.sin(ang) * 420;
+        ctx.font = '10px monospace';
+        ctx.fillStyle = `rgba(255, 255, 35, ${0.6 * intensityFactor})`;
+        ctx.fillText(`${deg.toString().padStart(3, '0')}°`, lx - 12, ly);
+      }
+
+      // Rotating Acoustic Sweep Beam with Luminous Gradient Fan
+      const sweepSpan = Math.PI * 0.42; // 75 degree wide wedge
+      const steps = 40;
       for (let i = 0; i < steps; i++) {
         const a = sonarAngle - (i / steps) * sweepSpan;
-        const alpha = (1 - i / steps) * 0.16 * intensityFactor;
+        const alpha = Math.pow(1 - i / steps, 1.4) * 0.35 * intensityFactor;
 
         ctx.beginPath();
         ctx.moveTo(sonarCenter.x, sonarCenter.y);
-        ctx.arc(sonarCenter.x, sonarCenter.y, sonarMaxRadius, a, a + 0.02);
+        ctx.arc(sonarCenter.x, sonarCenter.y, sonarMaxRadius, a, a + 0.025);
         ctx.closePath();
         ctx.fillStyle = `rgba(255, 255, 35, ${alpha})`;
         ctx.fill();
       }
 
-      // Leading sharp sweep beam line
+      // Bright Neon Leading Edge Beam
       ctx.beginPath();
       ctx.moveTo(sonarCenter.x, sonarCenter.y);
       ctx.lineTo(sonarCenter.x + Math.cos(sonarAngle) * sonarMaxRadius, sonarCenter.y + Math.sin(sonarAngle) * sonarMaxRadius);
-      ctx.strokeStyle = `rgba(255, 255, 35, ${0.7 * intensityFactor})`;
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#FFFF23';
+      ctx.lineWidth = 2.5;
       ctx.shadowColor = '#FFFF23';
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 18;
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // Sonar Targets Check & Ping
+      // Sonar Targets Detection & Pinging
       sonarTargets.forEach((target) => {
-        // Calculate angle to target
         const dx = target.x - sonarCenter.x;
         const dy = target.y - sonarCenter.y;
         let targetAngle = Math.atan2(dy, dx);
         if (targetAngle < 0) targetAngle += Math.PI * 2;
 
-        // Check if sweep beam is hitting this target
         const angleDiff = (sonarAngle - targetAngle + Math.PI * 2) % (Math.PI * 2);
-        if (angleDiff < 0.08) {
+        if (angleDiff < 0.1) {
           target.detectedTime = Date.now();
           target.echoRadius = target.size;
         }
 
         const elapsed = Date.now() - target.detectedTime;
-        const isFresh = elapsed < 2800;
-        const pingAlpha = isFresh ? Math.max(0, 1 - elapsed / 2800) * intensityFactor : 0.08 * intensityFactor;
+        const isFresh = elapsed < 3500;
+        const pingAlpha = isFresh ? Math.max(0, 1 - elapsed / 3500) * intensityFactor : 0.25 * intensityFactor;
 
-        // Expanding echo ring
+        // Expanding echo acoustic wave rings
         if (isFresh) {
-          target.echoRadius += 0.8 * speedMultiplier;
+          target.echoRadius += 1.2 * speedMultiplier;
           ctx.beginPath();
           ctx.arc(target.x, target.y, target.echoRadius, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(255, 255, 35, ${pingAlpha * 0.7})`;
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = `rgba(255, 255, 35, ${pingAlpha * 0.8})`;
+          ctx.lineWidth = 1.5;
           ctx.stroke();
+
+          // Second echo ring
+          if (target.echoRadius > 20) {
+            ctx.beginPath();
+            ctx.arc(target.x, target.y, target.echoRadius - 15, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(45, 212, 191, ${pingAlpha * 0.5})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
         }
 
-        // Target blip point
+        // Target marker blip
         ctx.beginPath();
         ctx.arc(target.x, target.y, target.size, 0, Math.PI * 2);
-        ctx.fillStyle = isFresh ? `rgba(255, 255, 35, ${pingAlpha})` : `rgba(45, 212, 191, ${0.15 * intensityFactor})`;
-        ctx.shadowColor = '#FFFF23';
-        ctx.shadowBlur = isFresh ? 12 : 0;
+        ctx.fillStyle = isFresh ? '#FFFF23' : `rgba(45, 212, 191, ${0.5 * intensityFactor})`;
+        ctx.shadowColor = isFresh ? '#FFFF23' : '#2DD4BF';
+        ctx.shadowBlur = isFresh ? 20 : 6;
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Target telemetry tag
-        if (isFresh && pingAlpha > 0.25) {
-          ctx.font = '10px monospace';
-          ctx.fillStyle = `rgba(255, 255, 35, ${pingAlpha})`;
-          ctx.fillText(`▲ ${target.label} [${target.depth}]`, target.x + 10, target.y - 6);
-        }
+        // Target HUD Callout Box & Label
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = isFresh ? '#FFFF23' : `rgba(45, 212, 191, ${0.7 * intensityFactor})`;
+        ctx.fillText(`▲ ${target.label}`, target.x + 12, target.y - 8);
+        ctx.font = '9px monospace';
+        ctx.fillStyle = `rgba(255, 255, 255, ${isFresh ? 0.9 : 0.5 * intensityFactor})`;
+        ctx.fillText(`DEPTH: ${target.depth} | RETURN: ${isFresh ? 'PULSE HIGH' : 'ACQ'}`, target.x + 12, target.y + 6);
       });
 
-      // Mouse Towfish Reticle
+      // Towfish Mouse Cursor Reticle
       if (mouseRef.current.active) {
         const mx = mouseRef.current.x;
         const my = mouseRef.current.y;
@@ -321,16 +402,25 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
         let mAngle = (Math.atan2(my - sonarCenter.y, mx - sonarCenter.x) * 180) / Math.PI;
         if (mAngle < 0) mAngle += 360;
 
-        ctx.strokeStyle = `rgba(45, 212, 191, ${0.25 * intensityFactor})`;
-        ctx.setLineDash([2, 4]);
+        ctx.strokeStyle = '#2DD4BF';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 4]);
         ctx.beginPath();
-        ctx.arc(mx, my, 22, 0, Math.PI * 2);
+        ctx.arc(mx, my, 26, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.font = '9px monospace';
-        ctx.fillStyle = `rgba(45, 212, 191, ${0.55 * intensityFactor})`;
-        ctx.fillText(`R: ${(mDist * 0.8).toFixed(1)}m | BRG: ${mAngle.toFixed(0).padStart(3, '0')}°`, mx + 26, my + 4);
+        ctx.beginPath();
+        ctx.moveTo(mx - 32, my);
+        ctx.lineTo(mx + 32, my);
+        ctx.moveTo(mx, my - 32);
+        ctx.lineTo(mx, my + 32);
+        ctx.strokeStyle = 'rgba(45, 212, 191, 0.5)';
+        ctx.stroke();
+
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = '#FFFF23';
+        ctx.fillText(`SONAR TOWFISH [${(mDist * 1.2).toFixed(1)}m · ${mAngle.toFixed(0).padStart(3, '0')}°]`, mx + 32, my + 4);
       }
 
       ctx.restore();
@@ -340,82 +430,100 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
     const renderBioluminescent = (time: number) => {
       ctx.save();
 
-      // Soft deep-sea underwater ambient gradient pulses
+      // Atmospheric Deep Sea Bioluminescent Clouds
       const bgGrad1 = ctx.createRadialGradient(
-        width * 0.25 + Math.sin(time * 0.0004) * 80,
-        height * 0.35 + Math.cos(time * 0.0003) * 60,
-        20,
-        width * 0.25,
-        height * 0.35,
-        width * 0.55
+        width * 0.3 + Math.sin(time * 0.0006) * 120,
+        height * 0.4 + Math.cos(time * 0.0005) * 90,
+        40,
+        width * 0.3,
+        height * 0.4,
+        width * 0.6
       );
-      bgGrad1.addColorStop(0, `rgba(45, 212, 191, ${0.06 * intensityFactor})`);
+      bgGrad1.addColorStop(0, `rgba(45, 212, 191, ${0.18 * intensityFactor})`);
+      bgGrad1.addColorStop(0.6, `rgba(14, 165, 233, ${0.08 * intensityFactor})`);
       bgGrad1.addColorStop(1, 'transparent');
       ctx.fillStyle = bgGrad1;
       ctx.fillRect(0, 0, width, height);
 
       const bgGrad2 = ctx.createRadialGradient(
-        width * 0.75 + Math.cos(time * 0.0005) * 90,
-        height * 0.65 + Math.sin(time * 0.0004) * 70,
-        30,
+        width * 0.75 + Math.cos(time * 0.0007) * 140,
+        height * 0.65 + Math.sin(time * 0.0006) * 110,
+        50,
         width * 0.75,
         height * 0.65,
-        width * 0.6
+        width * 0.65
       );
-      bgGrad2.addColorStop(0, `rgba(255, 255, 35, ${0.04 * intensityFactor})`);
+      bgGrad2.addColorStop(0, `rgba(255, 255, 35, ${0.12 * intensityFactor})`);
+      bgGrad2.addColorStop(0.5, `rgba(99, 102, 241, ${0.08 * intensityFactor})`);
       bgGrad2.addColorStop(1, 'transparent');
       ctx.fillStyle = bgGrad2;
       ctx.fillRect(0, 0, width, height);
 
-      // Render drifting plankton & marine snow
+      // Render Drifting Bioluminescent Plankton & Deep Sea Particles
       bioParticles.forEach((p) => {
-        // Move with slow ocean drift
         p.x += p.vx * speedMultiplier;
         p.y += p.vy * speedMultiplier;
 
-        // Interactive mouse repulsion/eddy
+        // Interactive mouse eddy repulsion
         if (mouseRef.current.active) {
           const dx = p.x - mouseRef.current.x;
           const dy = p.y - mouseRef.current.y;
           const dist = Math.hypot(dx, dy);
-          if (dist < 160 && dist > 1) {
-            const force = (1 - dist / 160) * 1.5;
+          if (dist < 200 && dist > 1) {
+            const force = (1 - dist / 200) * 3.5;
             p.x += (dx / dist) * force;
             p.y += (dy / dist) * force;
           }
         }
 
-        // Wrap around borders
-        if (p.y < -20) {
-          p.y = height + 10;
+        // Boundary wrap
+        if (p.y < -25) {
+          p.y = height + 15;
           p.x = Math.random() * width;
         }
-        if (p.x < -20) p.x = width + 10;
-        if (p.x > width + 20) p.x = -10;
+        if (p.x < -25) p.x = width + 15;
+        if (p.x > width + 25) p.x = -15;
 
-        // Breathing pulse
+        // Breathing bioluminescent pulse
         p.pulsePhase += p.pulseSpeed * speedMultiplier;
-        const currentAlpha = (p.alpha + Math.sin(p.pulsePhase) * 0.2) * intensityFactor;
-        const currentSize = p.originalSize + Math.sin(p.pulsePhase) * 0.8;
+        const currentAlpha = Math.min(1.0, (p.alpha + Math.sin(p.pulsePhase) * 0.3) * intensityFactor);
+        const currentSize = p.originalSize + Math.sin(p.pulsePhase) * 1.5;
 
-        // Bioluminescent Halo
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize * 4.5);
+        // Radiant Outer Glow Halo
+        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, currentSize * 5.5);
         glow.addColorStop(0, p.color);
         glow.addColorStop(1, 'transparent');
 
         ctx.beginPath();
-        ctx.arc(p.x, p.y, currentSize * 4.5, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, currentSize * 5.5, 0, Math.PI * 2);
         ctx.fillStyle = glow;
-        ctx.globalAlpha = Math.max(0, currentAlpha * 0.45);
+        ctx.globalAlpha = currentAlpha * 0.6;
         ctx.fill();
 
-        // Core bright ember
+        // Intense Core Ember
         ctx.beginPath();
         ctx.arc(p.x, p.y, currentSize, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.min(1, currentAlpha * 1.2);
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 15;
+        ctx.globalAlpha = currentAlpha;
         ctx.fill();
+        ctx.shadowBlur = 0;
       });
+
+      // Mouse Sparkle Trail
+      mouseRef.current.trail.forEach((t, idx) => {
+        t.alpha -= 0.04;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 3.5 * (1 - idx / 15), 0, Math.PI * 2);
+        ctx.fillStyle = '#2DD4BF';
+        ctx.shadowColor = '#FFFF23';
+        ctx.shadowBlur = 10;
+        ctx.globalAlpha = Math.max(0, t.alpha);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+      mouseRef.current.trail = mouseRef.current.trail.filter(t => t.alpha > 0);
 
       ctx.restore();
     };
@@ -423,25 +531,23 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
     // 3. NEURAL SENSOR MESH RENDERER
     const renderNeuralMesh = () => {
       ctx.save();
-      const maxDistance = 160;
+      const maxDistance = 190;
 
       // Update node positions
       meshNodes.forEach((node) => {
         node.x += node.vx * speedMultiplier;
         node.y += node.vy * speedMultiplier;
 
-        // Bounce walls
-        if (node.x < 20 || node.x > width - 20) node.vx *= -1;
-        if (node.y < 20 || node.y > height - 20) node.vy *= -1;
+        if (node.x < 30 || node.x > width - 30) node.vx *= -1;
+        if (node.y < 30 || node.y > height - 30) node.vy *= -1;
 
-        // Mouse attraction
         if (mouseRef.current.active) {
           const dx = mouseRef.current.x - node.x;
           const dy = mouseRef.current.y - node.y;
           const dist = Math.hypot(dx, dy);
-          if (dist < 180 && dist > 2) {
-            node.x += (dx / dist) * 0.5;
-            node.y += (dy / dist) * 0.5;
+          if (dist < 220 && dist > 2) {
+            node.x += (dx / dist) * 0.8;
+            node.y += (dy / dist) * 0.8;
           }
         }
       });
@@ -454,19 +560,35 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
           const dist = Math.hypot(n2.x - n1.x, n2.y - n1.y);
 
           if (dist < maxDistance) {
-            const alpha = (1 - dist / maxDistance) * 0.22 * intensityFactor;
+            const alpha = Math.pow(1 - dist / maxDistance, 1.2) * 0.65 * intensityFactor;
             ctx.beginPath();
             ctx.moveTo(n1.x, n1.y);
             ctx.lineTo(n2.x, n2.y);
-            ctx.strokeStyle = n1.isHub || n2.isHub ? `rgba(255, 255, 35, ${alpha * 1.4})` : `rgba(45, 212, 191, ${alpha})`;
-            ctx.lineWidth = n1.isHub || n2.isHub ? 1.2 : 0.8;
+            ctx.strokeStyle = n1.isHub || n2.isHub ? `rgba(255, 255, 35, ${alpha * 1.3})` : `rgba(45, 212, 191, ${alpha})`;
+            ctx.lineWidth = n1.isHub || n2.isHub ? 1.8 : 1.0;
             ctx.stroke();
           }
         }
       }
 
-      // Draw telemetry signal packets traveling between nodes
-      packets.forEach((packet, idx) => {
+      // Draw mouse connection rays to nearby nodes
+      if (mouseRef.current.active) {
+        meshNodes.forEach((node) => {
+          const dist = Math.hypot(node.x - mouseRef.current.x, node.y - mouseRef.current.y);
+          if (dist < 240) {
+            const alpha = (1 - dist / 240) * 0.75 * intensityFactor;
+            ctx.beginPath();
+            ctx.moveTo(mouseRef.current.x, mouseRef.current.y);
+            ctx.lineTo(node.x, node.y);
+            ctx.strokeStyle = `rgba(255, 255, 35, ${alpha})`;
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+          }
+        });
+      }
+
+      // Telemetry Signal Packets
+      packets.forEach((packet) => {
         const from = meshNodes[packet.fromNode];
         const to = meshNodes[packet.toNode];
         if (!from || !to) return;
@@ -482,58 +604,92 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
         const py = from.y + (to.y - from.y) * packet.progress;
 
         ctx.beginPath();
-        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = packet.color;
         ctx.shadowColor = packet.color;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 14;
         ctx.fill();
         ctx.shadowBlur = 0;
       });
 
-      // Draw Nodes
+      // Render Nodes with Halos & Labels
       meshNodes.forEach((node) => {
-        node.pulse += 0.03 * speedMultiplier;
-        const pulseScale = 1 + Math.sin(node.pulse) * 0.2;
+        node.pulse += 0.04 * speedMultiplier;
+        const pulseScale = 1 + Math.sin(node.pulse) * 0.25;
 
+        // Outer Halo
         ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius * pulseScale, 0, Math.PI * 2);
-        ctx.fillStyle = node.isHub ? `rgba(255, 255, 35, ${0.85 * intensityFactor})` : `rgba(45, 212, 191, ${0.65 * intensityFactor})`;
+        ctx.arc(node.x, node.y, node.radius * 3 * pulseScale, 0, Math.PI * 2);
+        ctx.fillStyle = node.isHub ? `rgba(255, 255, 35, ${0.2 * intensityFactor})` : `rgba(45, 212, 191, ${0.15 * intensityFactor})`;
         ctx.fill();
 
+        // Node Body
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.radius * pulseScale, 0, Math.PI * 2);
+        ctx.fillStyle = node.isHub ? '#FFFF23' : '#2DD4BF';
+        ctx.shadowColor = node.isHub ? '#FFFF23' : '#2DD4BF';
+        ctx.shadowBlur = node.isHub ? 16 : 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Hub ring
         if (node.isHub) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius * 2.8 * pulseScale, 0, Math.PI * 2);
-          ctx.strokeStyle = `rgba(255, 255, 35, ${0.25 * intensityFactor})`;
-          ctx.lineWidth = 1;
+          ctx.arc(node.x, node.y, node.radius * 4 * pulseScale, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(255, 255, 35, ${0.5 * intensityFactor})`;
+          ctx.lineWidth = 1.2;
           ctx.stroke();
+
+          ctx.font = 'bold 9px monospace';
+          ctx.fillStyle = '#FFFF23';
+          ctx.fillText(`▲ ${node.id}`, node.x + 12, node.y + 3);
         }
       });
 
       ctx.restore();
     };
 
-    // 4. OCEANIC CAUSTICS & UNDULATING WAVES RENDERER
-    const renderOceanicWaves = (time: number) => {
+    // 4. OCEANIC CAUSTICS & VOLUMETRIC WAVES RENDERER
+    const renderOceanicWaves = () => {
       ctx.save();
-      waveTime += 0.008 * speedMultiplier;
+      waveTime += 0.01 * speedMultiplier;
 
+      // Volumetric sunlight caustics beams piercing water
+      const beamCount = 5;
+      for (let b = 0; b < beamCount; b++) {
+        const beamX = width * (0.15 + b * 0.2) + Math.sin(waveTime * 0.8 + b) * 60;
+        const beamGrad = ctx.createLinearGradient(beamX, 0, beamX + 120, height);
+        beamGrad.addColorStop(0, `rgba(45, 212, 191, ${0.18 * intensityFactor})`);
+        beamGrad.addColorStop(0.4, `rgba(255, 255, 35, ${0.08 * intensityFactor})`);
+        beamGrad.addColorStop(1, 'transparent');
+
+        ctx.fillStyle = beamGrad;
+        ctx.beginPath();
+        ctx.moveTo(beamX - 40, 0);
+        ctx.lineTo(beamX + 80, 0);
+        ctx.lineTo(beamX + 260, height);
+        ctx.lineTo(beamX + 120, height);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Layered undulating sinusoidal waves
       const waveLayers = [
-        { amplitude: 45, frequency: 0.0018, speed: 1.0, yOffset: height * 0.35, color: `rgba(13, 148, 136, ${0.08 * intensityFactor})` },
-        { amplitude: 60, frequency: 0.0014, speed: -0.7, yOffset: height * 0.5, color: `rgba(45, 212, 191, ${0.07 * intensityFactor})` },
-        { amplitude: 75, frequency: 0.0012, speed: 1.2, yOffset: height * 0.65, color: `rgba(56, 189, 248, ${0.06 * intensityFactor})` },
-        { amplitude: 90, frequency: 0.0009, speed: -0.9, yOffset: height * 0.8, color: `rgba(255, 255, 35, ${0.04 * intensityFactor})` },
+        { amplitude: 55, freq: 0.0016, speed: 1.0, yOffset: height * 0.35, color: `rgba(13, 148, 136, ${0.28 * intensityFactor})` },
+        { amplitude: 70, freq: 0.0012, speed: -0.8, yOffset: height * 0.5, color: `rgba(45, 212, 191, ${0.22 * intensityFactor})` },
+        { amplitude: 85, freq: 0.001, speed: 1.3, yOffset: height * 0.65, color: `rgba(56, 189, 248, ${0.2 * intensityFactor})` },
+        { amplitude: 100, freq: 0.0008, speed: -1.0, yOffset: height * 0.8, color: `rgba(255, 255, 35, ${0.14 * intensityFactor})` },
       ];
 
       waveLayers.forEach((layer) => {
         ctx.beginPath();
         ctx.moveTo(0, height);
 
-        for (let x = 0; x <= width; x += 12) {
-          // Complex sine summation for realistic water wave fluid motion
+        for (let x = 0; x <= width; x += 10) {
           const y =
             layer.yOffset +
-            Math.sin(x * layer.frequency + waveTime * layer.speed) * layer.amplitude +
-            Math.sin(x * layer.frequency * 2.1 + waveTime * layer.speed * 1.5) * (layer.amplitude * 0.3);
+            Math.sin(x * layer.freq + waveTime * layer.speed) * layer.amplitude +
+            Math.sin(x * layer.freq * 2.2 + waveTime * layer.speed * 1.4) * (layer.amplitude * 0.35);
 
           ctx.lineTo(x, y);
         }
@@ -542,49 +698,70 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
         ctx.closePath();
         ctx.fillStyle = layer.color;
         ctx.fill();
+
+        // Wave Crest Highlight Line
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 10) {
+          const y =
+            layer.yOffset +
+            Math.sin(x * layer.freq + waveTime * layer.speed) * layer.amplitude +
+            Math.sin(x * layer.freq * 2.2 + waveTime * layer.speed * 1.4) * (layer.amplitude * 0.35);
+
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 35, 0.4)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
       });
 
-      // Ambient underwater caustic beams
-      const beamCount = 4;
-      for (let b = 0; b < beamCount; b++) {
-        const beamX = width * (0.2 + b * 0.22) + Math.sin(waveTime + b) * 50;
-        const beamGrad = ctx.createLinearGradient(beamX, 0, beamX + 80, height);
-        beamGrad.addColorStop(0, `rgba(45, 212, 191, ${0.04 * intensityFactor})`);
-        beamGrad.addColorStop(0.5, `rgba(255, 255, 35, ${0.02 * intensityFactor})`);
-        beamGrad.addColorStop(1, 'transparent');
+      // Rising ocean bubbles
+      bubbles.forEach((b) => {
+        b.y -= b.vy * speedMultiplier;
+        b.x += Math.sin(waveTime + b.y * 0.02) * 0.5;
 
-        ctx.fillStyle = beamGrad;
+        if (b.y < -10) {
+          b.y = height + 10;
+          b.x = Math.random() * width;
+        }
+
         ctx.beginPath();
-        ctx.moveTo(beamX - 30, 0);
-        ctx.lineTo(beamX + 60, 0);
-        ctx.lineTo(beamX + 220, height);
-        ctx.lineTo(beamX + 110, height);
-        ctx.closePath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${b.alpha * intensityFactor})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${b.alpha * 1.2})`;
         ctx.fill();
-      }
+      });
 
       ctx.restore();
     };
 
-    // Click interactive water ripple
+    // Click interactive acoustic ripple
     const renderClickRipple = () => {
       if (!mouseRef.current.clickRipple) return;
       const r = mouseRef.current.clickRipple;
-      r.r += 3.5 * speedMultiplier;
+      r.r += 4.5 * speedMultiplier;
       r.alpha -= 0.02 * speedMultiplier;
 
       ctx.save();
       ctx.beginPath();
       ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(255, 255, 35, ${Math.max(0, r.alpha * intensityFactor)})`;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#FFFF23';
+      ctx.shadowBlur = 15;
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(r.x, r.y, r.r * 0.6, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(45, 212, 191, ${Math.max(0, r.alpha * 0.7 * intensityFactor)})`;
-      ctx.lineWidth = 1.5;
+      ctx.arc(r.x, r.y, r.r * 0.65, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(45, 212, 191, ${Math.max(0, r.alpha * 0.8 * intensityFactor)})`;
+      ctx.lineWidth = 1.8;
       ctx.stroke();
+      ctx.shadowBlur = 0;
       ctx.restore();
 
       if (r.alpha <= 0) {
@@ -592,13 +769,22 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
       }
     };
 
-    // Animation loop
+    // Main animation loop
     const loop = (time: number) => {
       ctx.clearRect(0, 0, width, height);
 
+      // Measure FPS
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFrameTime >= 1000) {
+        setFps(frameCount);
+        frameCount = 0;
+        lastFrameTime = now;
+      }
+
       switch (config.theme) {
         case 'SONAR_SWEEP':
-          renderSonar(time);
+          renderSonar();
           break;
         case 'BIOLUMINESCENT_ABYSS':
           renderBioluminescent(time);
@@ -607,10 +793,10 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
           renderNeuralMesh();
           break;
         case 'OCEANIC_CAUSTICS_WAVES':
-          renderOceanicWaves(time);
+          renderOceanicWaves();
           break;
         default:
-          renderSonar(time);
+          renderSonar();
       }
 
       renderClickRipple();
@@ -631,11 +817,91 @@ export const LiveWallpaper: React.FC<LiveWallpaperProps> = ({ className = '' }) 
 
   if (!config.enabled) return null;
 
+  const currentThemeObj = WALLPAPER_THEMES.find(t => t.id === config.theme) || WALLPAPER_THEMES[0];
+
   return (
-    <canvas
-      ref={canvasRef}
-      aria-hidden="true"
-      className={`fixed inset-0 pointer-events-none z-0 select-none transition-opacity duration-700 ${className}`}
-    />
+    <>
+      {/* Dynamic 60FPS Ocean Canvas */}
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        style={{ opacity: config.opacity ?? 0.95 }}
+        className={`fixed inset-0 pointer-events-none select-none transition-opacity duration-500 ${
+          config.showcaseMode ? 'z-50 pointer-events-auto cursor-crosshair' : 'z-0'
+        } ${className}`}
+      />
+
+      {/* Cinematic Fullscreen Showcase HUD Overlay (When showcaseMode is true) */}
+      {config.showcaseMode && (
+        <div className="fixed inset-0 z-50 pointer-events-none flex flex-col justify-between p-6 select-none font-mono">
+          
+          {/* Top Bar */}
+          <div className="flex items-center justify-between pointer-events-auto bg-[#0C0D0E]/85 backdrop-blur-xl border border-[#20232A] rounded-2xl px-6 py-3.5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[#FFFF23] text-black flex items-center justify-center font-black">
+                <Radar className="w-5 h-5 animate-spin" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-white uppercase tracking-wider">{currentThemeObj.name}</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFFF23]/20 text-[#FFFF23] border border-[#FFFF23]/40">
+                    CINEMATIC 60FPS
+                  </span>
+                </div>
+                <p className="text-[10px] text-stone-400 font-sans">{currentThemeObj.subtitle}</p>
+              </div>
+            </div>
+
+            {/* Quick Theme Buttons in Showcase */}
+            <div className="flex items-center gap-2">
+              {WALLPAPER_THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => wallpaperService.setTheme(theme.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    config.theme === theme.id
+                      ? 'bg-[#FFFF23] text-black shadow-[0_0_12px_rgba(255,255,35,0.4)]'
+                      : 'bg-[#141518] text-stone-400 hover:text-white border border-[#25282F]'
+                  }`}
+                >
+                  {theme.name.split(' ')[0]}
+                </button>
+              ))}
+
+              <button
+                onClick={() => wallpaperService.setShowcaseMode(false)}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#FF6F59] hover:bg-white text-white hover:text-black text-xs font-bold transition-all shadow-md ml-2"
+                title="Exit Cinematic Mode (ESC)"
+              >
+                <X className="w-4 h-4" />
+                <span>Exit Cinema (ESC)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom Telemetry HUD */}
+          <div className="flex items-center justify-between pointer-events-auto bg-[#0C0D0E]/85 backdrop-blur-xl border border-[#20232A] rounded-2xl px-6 py-3 shadow-2xl text-xs text-stone-400">
+            <div className="flex items-center gap-6">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-white font-bold">HYDROACOUSTIC SENSORS: ONLINE</span>
+              </span>
+              <span>RENDER: {fps} FPS</span>
+              <span>CURSOR: INTERACTIVE TOWFISH RADAR</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-stone-400 text-[11px]">Click anywhere to fire acoustic pulse shockwave</span>
+              <button
+                onClick={() => wallpaperService.setShowcaseMode(false)}
+                className="text-[#FFFF23] underline font-bold"
+              >
+                Return to Dashboard →
+              </button>
+            </div>
+          </div>
+
+        </div>
+      )}
+    </>
   );
 };

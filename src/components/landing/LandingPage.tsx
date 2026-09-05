@@ -34,7 +34,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
   const [selectedSpecTab, setSelectedSpecTab] = useState<'sonar' | 'vision' | 'fusion'>('sonar');
 
   return (
-    <div className="min-h-screen bg-[#0C0D0E]/90 text-[#F3F3F3] relative selection:bg-[#FFFF23] selection:text-black">
+    <div className="min-h-screen bg-[#0C0D0E]/50 text-[#F3F3F3] relative selection:bg-[#FFFF23] selection:text-black">
       {/* 60FPS Live Ocean Wallpaper Background */}
       <LiveWallpaper />
 
@@ -42,7 +42,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
       <CustomCursor />
 
       {/* Ambient Moving Glow Gradients */}
-      <AmbientGradients intensity="vibrant" />
+      <AmbientGradients intensity="subtle" />
 
       {/* Top Floating Glass Navigation */}
       <nav className="sticky top-0 z-40 bg-[#0C0D0E]/85 backdrop-blur-xl border-b border-[#20232A] px-6 lg:px-12 py-3.5 transition-all">
@@ -159,7 +159,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
       </section>
 
       {/* ================= FAUX 3D HARDWARE INTERACTIVE LAB ================= */}
-      <section className="py-24 px-6 lg:px-12 bg-[#0E0F12] border-t border-[#20232A] relative z-10">
+      <section className="py-24 px-6 lg:px-12 bg-[#0C0D0E]/60 backdrop-blur-md border-t border-[#20232A]/60 relative z-10">
         <div className="max-w-7xl mx-auto">
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
@@ -318,7 +318,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp, onOpenAuth
       </section>
 
       {/* Footer */}
-      <footer className="py-12 bg-[#0C0D0E] px-6 lg:px-12 border-t border-[#20232A] relative z-10">
+      <footer className="py-12 bg-[#0C0D0E]/60 backdrop-blur-md px-6 lg:px-12 border-t border-[#20232A]/60 relative z-10">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-400">
           <div className="flex items-center gap-2">
             <span className="font-black text-white">MARINESIGHT AI</span>
