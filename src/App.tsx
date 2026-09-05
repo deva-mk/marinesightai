@@ -14,6 +14,7 @@ import { LiveWallpaper } from './components/common/LiveWallpaper';
 // Feature Views
 import { MainOverviewDashboard } from './features/dashboard/MainOverviewDashboard';
 import { SonarIntelligence } from './features/sonar/SonarIntelligence';
+import { SonarPS57WinningSuite } from './features/sonar/SonarPS57WinningSuite';
 import { SurfaceVision } from './features/surface/SurfaceVision';
 import { LiveSurfaceMonitoring } from './features/surface/LiveSurfaceMonitoring';
 import { MultimodalFusion } from './features/fusion/MultimodalFusion';
@@ -168,6 +169,12 @@ export const App: React.FC = () => {
             {activeTab === 'sonar' && (
               <SonarIntelligence
                 detections={detections}
+                onNavigate={handleNavigate}
+              />
+            )}
+
+            {activeTab === 'ps57' && (
+              <SonarPS57WinningSuite
                 onNavigate={handleNavigate}
               />
             )}

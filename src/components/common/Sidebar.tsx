@@ -99,6 +99,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       title: 'DETECTION PIPELINES',
       items: [
         { id: 'sonar', label: 'Sonar Intelligence', icon: Radar },
+        { id: 'ps57', label: 'PS 57 Sonar Suite', icon: Sparkles, badge: 'WINNING PS57', badgeColor: 'bg-[#FFFF23] text-black' },
         { id: 'surface', label: 'Surface Vision', icon: Eye },
         { id: 'live', label: 'Live Monitoring', icon: Video, badge: 'REALTIME' },
         { id: 'fusion', label: 'Multimodal Fusion', icon: Layers, badge: 'AI', badgeColor: 'bg-[#FFFF23] text-black' }

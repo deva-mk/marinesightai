@@ -229,6 +229,14 @@ export const SonarIntelligence: React.FC<SonarIntelligenceProps> = ({
 
         {/* Workspace Mode Switcher */}
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onNavigate('ps57')}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#121316] text-[#FFFF23] border border-[#23262D] text-xs font-black hover:bg-black transition-all shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 fill-[#FFFF23]" />
+            <span>Launch PS 57 Winning Suite</span>
+          </button>
+
           <div className="flex items-center bg-[#F2EDE4] p-1 rounded-xl border border-[#DDD5C7] text-xs font-bold">
             <button
               onClick={() => setActiveWorkspaceTab('INGESTION_STUDIO')}
