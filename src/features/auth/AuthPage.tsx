@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../../types';
 import { marineStorage, DEFAULT_ACCOUNTS } from '../../services/storage';
+import { cryptoVault } from '../../services/cryptoVault';
 
 interface AuthPageProps {
   onNavigate: (view: string, id?: string) => void;
@@ -102,12 +103,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
 
   const handleLoginFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emailInput.trim()) {
+    const cleanEmail = emailInput.trim().toLowerCase();
+    if (!cleanEmail) {
       showNotification('Please enter a valid email address.', 'error');
       return;
     }
 
-    const res = marineStorage.login(emailInput.trim(), passwordInput);
+    // Check if email is already registered
+    const isRegistered = marineStorage.isEmailRegistered(cleanEmail);
+    if (!isRegistered) {
+      // Direct user to Sign Up mode
+      setMode('REGISTER');
+      const inferredName = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      setNameInput(inferredName);
+      showNotification(`⚠️ Email "${cleanEmail}" is not registered. Switched to Sign Up to create your account!`, 'info');
+      return;
+    }
+
+    const res = marineStorage.login(cleanEmail, passwordInput);
     if (res.success && res.user) {
       setCurrentUser(res.user);
       setIsLoggedIn(true);
@@ -672,12 +685,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
           {/* Mode: Registered Users Directory */}
           {mode === 'USERS' && (
             <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Zero-Knowledge Privacy Active</span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-700 bg-white/70 px-2 py-0.5 rounded">
+                  SHA-256 + PII Redacted
+                </span>
+              </div>
               <p className="text-xs text-[#736B5E]">
-                All registered accounts currently saved in MarineSight storage:
+                Personal details of other operators are masked to prevent unauthorized disclosure:
               </p>
               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                 {registeredUsers.map((u) => {
                   const isActive = currentUser.email.toLowerCase() === u.email.toLowerCase() && isLoggedIn;
+                  const displayEmail = isActive ? u.email : cryptoVault.maskEmail(u.email);
+                  const displayName = isActive ? u.name : cryptoVault.maskName(u.name);
+
                   return (
                     <div 
                       key={u.id}
@@ -689,33 +714,38 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onNavigate }) => {
                         <img src={u.avatarUrl} alt="" className="w-9 h-9 rounded-xl object-cover border border-[#E3DBD0]" />
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-xs font-bold text-[#2A2A2A]">{u.name}</p>
+                            <p className="text-xs font-bold text-[#2A2A2A]">{displayName}</p>
                             <span className="px-2 py-0.5 rounded text-[9px] font-extrabold bg-white border border-[#E3DBD0]">
                               {u.role}
                             </span>
+                            {!isActive && (
+                              <span className="text-[9px] font-mono text-[#8C8275] bg-white/60 px-1.5 py-0.5 rounded">
+                                PII Masked
+                              </span>
+                            )}
                           </div>
-                          <p className="text-[11px] text-[#736B5E]">{u.email} • {u.organization}</p>
+                          <p className="text-[11px] text-[#736B5E] font-mono">{displayEmail} • {u.organization}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
                         {isActive ? (
-                          <span className="text-[10px] font-bold text-[#4F6F52] bg-[#4F6F52]/10 px-2 py-1 rounded-lg">
-                            Active
+                          <span className="text-[10px] font-bold text-[#4F6F52] bg-[#4F6F52]/10 px-2 py-1 rounded-lg flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Active Session
                           </span>
                         ) : (
                           <button
                             onClick={() => {
-                              const res = marineStorage.login(u.email, u.password || 'admin123');
-                              if (res.success && res.user) {
-                                setCurrentUser(res.user);
-                                setIsLoggedIn(true);
-                                showNotification(`Switched session to ${res.user.name}`, 'success');
-                              }
+                              setEmailInput(u.email);
+                              setPasswordInput('');
+                              setMode('LOGIN');
+                              showNotification(`Selected ${displayName}. Enter password to verify authorization.`, 'info');
                             }}
-                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAE4D9] text-[#2A2A2A] text-xs font-bold border border-[#E3DBD0] transition-colors"
+                            className="px-2.5 py-1 rounded-lg bg-white hover:bg-[#EAE4D9] text-[#2A2A2A] text-xs font-bold border border-[#E3DBD0] transition-colors flex items-center gap-1 cursor-pointer"
                           >
-                            Sign In As
+                            <Key className="w-3 h-3 text-[#FF6F59]" />
+                            <span>Sign In</span>
                           </button>
                         )}
                       </div>

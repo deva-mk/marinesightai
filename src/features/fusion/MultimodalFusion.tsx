@@ -278,8 +278,8 @@ export const MultimodalFusion: React.FC<MultimodalFusionProps> = ({ detections =
               className="w-full p-2 bg-white border border-[#DDD5C7] rounded-xl font-bold text-[#2A2A2A] text-xs focus:outline-none"
             >
               {sonarCandidates.length > 0 ? (
-                sonarCandidates.map(d => (
-                  <option key={d.id} value={d.id}>
+                sonarCandidates.map((d, i) => (
+                  <option key={`sonar-${d.id}-${i}`} value={d.id}>
                     {d.id} • {d.title} ({d.category}) - {d.location.sector}
                   </option>
                 ))
@@ -305,8 +305,8 @@ export const MultimodalFusion: React.FC<MultimodalFusionProps> = ({ detections =
               className="w-full p-2 bg-white border border-[#DDD5C7] rounded-xl font-bold text-[#2A2A2A] text-xs focus:outline-none"
             >
               {droneCandidates.length > 0 ? (
-                droneCandidates.map(d => (
-                  <option key={d.id} value={d.id}>
+                droneCandidates.map((d, i) => (
+                  <option key={`drone-${d.id}-${i}`} value={d.id}>
                     {d.id} • {d.title} ({d.category}) - {d.location.sector}
                   </option>
                 ))

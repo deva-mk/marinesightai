@@ -41,6 +41,7 @@ interface SidebarProps {
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
   userRole?: UserRole;
+  onOpenOceanExperience?: () => void;
   unreadAlertsCount?: number;
   incidentsCount?: number;
   missionsCount?: number;
@@ -74,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen,
   onCloseMobile,
   userRole = 'ADMIN',
+  onOpenOceanExperience,
   unreadAlertsCount = 0,
   incidentsCount = 0,
   missionsCount = 0,
@@ -92,56 +94,169 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'COMMAND',
       items: [
-        { id: 'dashboard', label: 'Marine Dashboard', icon: LayoutDashboard }
+        { 
+          id: 'dashboard', 
+          label: 'Marine Dashboard', 
+          icon: LayoutDashboard,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER', 'CLEANUP_TEAM', 'VIEWER']
+        }
       ]
     },
     {
       title: 'DETECTION PIPELINES',
       items: [
-        { id: 'sonar', label: 'Sonar Intelligence', icon: Radar },
-        { id: 'ps57', label: 'PS 57 Sonar Suite', icon: Sparkles, badge: 'WINNING PS57', badgeColor: 'bg-[#FFFF23] text-black' },
-        { id: 'surface', label: 'Surface Vision', icon: Eye },
-        { id: 'live', label: 'Live Monitoring', icon: Video, badge: 'REALTIME' },
-        { id: 'fusion', label: 'Multimodal Fusion', icon: Layers, badge: 'AI', badgeColor: 'bg-[#FFFF23] text-black' }
+        { 
+          id: 'sonar', 
+          label: 'Sonar Intelligence', 
+          icon: Radar,
+          allowedRoles: ['ADMIN', 'RESEARCHER']
+        },
+        { 
+          id: 'ps57', 
+          label: 'PS 57 Sonar Suite', 
+          icon: Sparkles, 
+          badge: 'WINNING PS57', 
+          badgeColor: 'bg-[#FFFF23] text-black',
+          allowedRoles: ['ADMIN', 'RESEARCHER']
+        },
+        { 
+          id: 'surface', 
+          label: 'Surface Vision', 
+          icon: Eye,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'CLEANUP_TEAM']
+        },
+        { 
+          id: 'live', 
+          label: 'Live Monitoring', 
+          icon: Video, 
+          badge: 'REALTIME',
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR']
+        },
+        { 
+          id: 'fusion', 
+          label: 'Multimodal Fusion', 
+          icon: Layers, 
+          badge: 'AI', 
+          badgeColor: 'bg-[#FFFF23] text-black',
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER']
+        }
       ]
     },
     {
       title: 'MAPS & INTELLIGENCE',
       items: [
-        { id: 'hotspots', label: 'Pollution Hotspots', icon: MapPin },
-        { id: 'risk', label: 'Risk Prediction', icon: TrendingUp },
-        { id: 'history', label: 'Detection Timeline', icon: History },
-        { id: 'analytics', label: 'Marine Analytics', icon: BarChart3 }
+        { 
+          id: 'hotspots', 
+          label: 'Pollution Hotspots', 
+          icon: MapPin,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER', 'CLEANUP_TEAM', 'VIEWER']
+        },
+        { 
+          id: 'risk', 
+          label: 'Risk Prediction', 
+          icon: TrendingUp,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER']
+        },
+        { 
+          id: 'history', 
+          label: 'Detection Timeline', 
+          icon: History,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER']
+        },
+        { 
+          id: 'analytics', 
+          label: 'Marine Analytics', 
+          icon: BarChart3,
+          allowedRoles: ['ADMIN', 'RESEARCHER', 'MARINE_OPERATOR', 'VIEWER']
+        }
       ]
     },
     {
       title: 'OPERATIONS',
       items: [
-        { id: 'incidents', label: 'Incident Command', icon: AlertTriangle, badge: activeIncidents > 0 ? activeIncidents : undefined, badgeColor: 'bg-red-500 text-white' },
-        { id: 'cleanup', label: 'Cleanup Missions', icon: Ship, badge: activeMissions > 0 ? activeMissions : undefined, badgeColor: 'bg-[#2DD4BF] text-black' },
-        { id: 'drones', label: 'Drone Missions', icon: Plane },
-        { id: 'alerts', label: 'Alerts Center', icon: Bell, badge: unreadAlerts > 0 ? unreadAlerts : undefined, badgeColor: 'bg-[#FFFF23] text-black' }
+        { 
+          id: 'incidents', 
+          label: 'Incident Command', 
+          icon: AlertTriangle, 
+          badge: activeIncidents > 0 ? activeIncidents : undefined, 
+          badgeColor: 'bg-red-500 text-white',
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'CLEANUP_TEAM']
+        },
+        { 
+          id: 'cleanup', 
+          label: 'Cleanup Missions', 
+          icon: Ship, 
+          badge: activeMissions > 0 ? activeMissions : undefined, 
+          badgeColor: 'bg-[#2DD4BF] text-black',
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'CLEANUP_TEAM']
+        },
+        { 
+          id: 'drones', 
+          label: 'Drone Missions', 
+          icon: Plane,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'CLEANUP_TEAM']
+        },
+        { 
+          id: 'alerts', 
+          label: 'Alerts Center', 
+          icon: Bell, 
+          badge: unreadAlerts > 0 ? unreadAlerts : undefined, 
+          badgeColor: 'bg-[#FFFF23] text-black',
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'CLEANUP_TEAM']
+        }
       ]
     },
     {
       title: 'AI ENGINE',
       items: [
-        { id: 'datasets', label: 'Dataset Lab', icon: Database },
-        { id: 'models', label: 'Model Registry', icon: Cpu }
+        { 
+          id: 'datasets', 
+          label: 'Dataset Lab', 
+          icon: Database,
+          allowedRoles: ['ADMIN', 'RESEARCHER']
+        },
+        { 
+          id: 'models', 
+          label: 'Model Registry', 
+          icon: Cpu,
+          allowedRoles: ['ADMIN', 'RESEARCHER']
+        }
       ]
     },
     {
       title: 'REPORTS & DATA',
       items: [
-        { id: 'reports', label: 'Reports & Exports', icon: FileText }
+        { 
+          id: 'reports', 
+          label: 'Reports & Exports', 
+          icon: FileText,
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER', 'CLEANUP_TEAM', 'VIEWER']
+        }
       ]
     },
     {
       title: 'AUTHENTICATION',
       items: [
-        { id: 'auth', label: isLoggedIn ? 'Account & Profile' : 'Login / Register', icon: Key, badge: isLoggedIn ? 'ACTIVE' : 'GUEST', badgeColor: isLoggedIn ? 'bg-[#2DD4BF] text-black' : 'bg-[#FFFF23] text-black' },
-        { id: 'users', label: 'Team & Roles', icon: Users, allowedRoles: ['ADMIN'] },
-        { id: 'settings', label: 'System Settings', icon: Settings }
+        { 
+          id: 'auth', 
+          label: isLoggedIn ? 'Account & Profile' : 'Login / Register', 
+          icon: Key, 
+          badge: isLoggedIn ? 'ACTIVE' : 'GUEST', 
+          badgeColor: isLoggedIn ? 'bg-[#2DD4BF] text-black' : 'bg-[#FFFF23] text-black',
+          allowedRoles: ['ADMIN', 'MARINE_OPERATOR', 'RESEARCHER', 'CLEANUP_TEAM', 'VIEWER']
+        },
+        { 
+          id: 'users', 
+          label: 'Team & Roles', 
+          icon: Users, 
+          allowedRoles: ['ADMIN'] 
+        },
+        { 
+          id: 'settings', 
+          label: 'System Settings', 
+          icon: Settings,
+          allowedRoles: ['ADMIN']
+        }
       ]
     }
   ];
@@ -242,7 +357,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Bottom User Account Session Card in Heynesh style */}
-        <div className="p-3 border-t border-[#20232A] bg-[#121316] m-2 rounded-2xl border">
+        <div className="p-3 border-t border-[#20232A] bg-[#121316] m-2 rounded-2xl border space-y-2.5">
           <div 
             onClick={() => handleSelect('auth')}
             className="flex items-center justify-between gap-2 cursor-pointer group"
@@ -262,7 +377,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="flex items-center gap-1 mt-0.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${isLoggedIn ? 'bg-[#FFFF23] shadow-[0_0_6px_#FFFF23]' : 'bg-stone-500'}`} />
                   <p className="text-[10px] font-mono font-bold text-stone-400 uppercase truncate">
-                    {isLoggedIn ? currentUser.role.replace('_', ' ') : 'Guest Mode'}
+                    {currentUser.role.replace('_', ' ')}
                   </p>
                 </div>
               </div>
@@ -287,6 +402,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             )}
           </div>
+
+          {/* Quick Evaluator Role Switcher */}
+          <div className="pt-2 border-t border-white/10 flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[10px] font-mono text-stone-400">
+              <span>ACTIVE ROLE (RBAC):</span>
+              <span className="font-bold text-[#FFFF23]">{currentUser.role}</span>
+            </div>
+            <select
+              value={currentUser.role}
+              onChange={(e) => {
+                const newRole = e.target.value as UserRole;
+                marineStorage.updateProfile({ role: newRole });
+              }}
+              className="w-full text-xs font-mono bg-[#0C0D0E] border border-white/15 rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#FFFF23] cursor-pointer"
+            >
+              <option value="ADMIN">ADMIN (Full Directorate)</option>
+              <option value="MARINE_OPERATOR">MARINE OPERATOR (Live Ops)</option>
+              <option value="RESEARCHER">RESEARCHER (Sonar & Datasets)</option>
+              <option value="CLEANUP_TEAM">CLEANUP TEAM (Response)</option>
+              <option value="VIEWER">VIEWER (Read-Only Metrics)</option>
+            </select>
+          </div>
+
+          {/* Return to Underwater Ocean Simulation Button */}
+          {onOpenOceanExperience && (
+            <button
+              onClick={onOpenOceanExperience}
+              className="w-full py-1.5 px-2 rounded-lg bg-teal-950/60 hover:bg-teal-900/80 border border-teal-500/30 text-[11px] font-mono text-teal-300 font-bold flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Waves className="w-3.5 h-3.5" />
+              <span>Ocean Simulation</span>
+            </button>
+          )}
         </div>
 
       </aside>

@@ -118,8 +118,8 @@ export const DetectionHistory: React.FC<DetectionHistoryProps> = ({ detections =
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F2EDE4]">
-              {filtered.map((d) => (
-                <tr key={d.id} className="hover:bg-[#F9F6F0]/70 transition-colors">
+              {filtered.map((d, idx) => (
+                <tr key={`${d.id}-${idx}`} className="hover:bg-[#F9F6F0]/70 transition-colors">
                   <td className="py-3.5 px-4 font-mono text-[#736B5E]">
                     {new Date(d.timestamp).toLocaleDateString()} {new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </td>

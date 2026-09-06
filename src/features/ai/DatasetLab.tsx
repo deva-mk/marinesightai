@@ -429,7 +429,7 @@ export const DatasetLab: React.FC<DatasetLabProps> = ({ onNavigate }) => {
       setDatasets(prev => {
         const existingIdx = prev.findIndex(d => d.id === finalDatasetId);
         const newBatchItem = {
-          batchId: `BATCH-${Date.now().toString().slice(-6)}`,
+          batchId: `BATCH-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
           name: batchName,
           samples: samplesAdded,
           format: annotationFormat,
@@ -512,7 +512,7 @@ export const DatasetLab: React.FC<DatasetLabProps> = ({ onNavigate }) => {
       setDatasets(prev => {
         const existingIdx = prev.findIndex(d => d.id === finalDatasetId);
         const newBatchItem = {
-          batchId: `BATCH-${Date.now().toString().slice(-6)}`,
+          batchId: `BATCH-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
           name: batchName,
           samples: samplesAdded,
           format: annotationFormat,

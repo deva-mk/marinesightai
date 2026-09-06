@@ -128,9 +128,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 Incidents ({results.incidents.length})
               </p>
               <div className="space-y-1.5">
-                {results.incidents.map((inc) => (
+                {results.incidents.map((inc, idx) => (
                   <button
-                    key={inc.id}
+                    key={`search-inc-${inc.id}-${idx}`}
                     onClick={() => {
                       navigateTo('incidents', inc.id);
                       onClose();
@@ -169,9 +169,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 Raw Detections ({results.detections.length})
               </p>
               <div className="space-y-1.5">
-                {results.detections.map((det) => (
+                {results.detections.map((det, idx) => (
                   <button
-                    key={det.id}
+                    key={`search-det-${det.id}-${idx}`}
                     onClick={() => {
                       navigateTo(det.source === 'SONAR' ? 'sonar' : 'surface', det.id);
                       onClose();
@@ -210,9 +210,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 Cleanup Missions ({results.missions.length})
               </p>
               <div className="space-y-1.5">
-                {results.missions.map((m) => (
+                {results.missions.map((m, idx) => (
                   <button
-                    key={m.id}
+                    key={`search-msn-${m.id}-${idx}`}
                     onClick={() => {
                       navigateTo('cleanup', m.id);
                       onClose();
@@ -242,9 +242,9 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 Hotspots ({results.hotspots.length})
               </p>
               <div className="space-y-1.5">
-                {results.hotspots.map((h) => (
+                {results.hotspots.map((h, idx) => (
                   <button
-                    key={h.id}
+                    key={`search-hot-${h.id}-${idx}`}
                     onClick={() => {
                       navigateTo('hotspots', h.id);
                       onClose();

@@ -162,7 +162,7 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
         const realResult: RealInferenceResult = await runRealNeuralInference(img, confidenceSlider, iouSlider);
 
         const newDet: DetectionRecord = {
-          id: `REAL-SURF-${Date.now().toString().slice(-4)}`,
+          id: `REAL-SURF-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
           title: `Surface Detection (${filename})`,
           category: (realResult.primaryCategory || categoryHint || 'Plastic') as any,
           source: 'DRONE',
@@ -249,6 +249,7 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
 
           const det: DetectionRecord = {
             ...(response.detection || selectedDetection),
+            id: response.detection?.id || `GV-SURF-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
             imageUrl: targetUrl,
             category: response.detection?.category || (mappedBoxes[0]?.category as any) || categoryHint || 'Plastic',
             boundingBoxes: mappedBoxes
@@ -769,9 +770,9 @@ export const SurfaceVision: React.FC<SurfaceVisionProps> = ({ detections = [], o
               <div className="bg-white p-5 rounded-3xl border border-[#E8E1D5] shadow-xs">
                 <h3 className="font-extrabold text-sm text-[#2A2A2A] mb-3">Logged Optical Transects</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {surfaceDetections.slice(0, 4).map((d) => (
+                  {surfaceDetections.slice(0, 4).map((d, dIdx) => (
                     <button
-                      key={d.id}
+                      key={`${d.id}-${dIdx}`}
                       onClick={() => setSelectedDetection(d)}
                       className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer ${
                         selectedDetection.id === d.id ? 'border-[#4F6F52] bg-[#4F6F52]/10 shadow-xs' : 'border-[#E8E1D5]'

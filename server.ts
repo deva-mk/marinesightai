@@ -2,6 +2,12 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { 
+  RAG_KNOWLEDGE_BASE, 
+  searchRAGKnowledge, 
+  buildRAGPrompt, 
+  generateGroundedRAGAnswer 
+} from './src/services/ragKnowledge';
 
 const app = express();
 const PORT = 3000;
@@ -187,7 +193,7 @@ app.post('/api/detection/sonar', async (req, res) => {
       processedAt: new Date().toISOString(),
       detectionCount: detectedObjects.length,
       detection: {
-        id: `MSA-SONAR-${Date.now().toString().slice(-4)}`,
+        id: `MSA-SONAR-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
         title: `Acoustic Transect Object (${filename})`,
         category: primary.category,
         confidence: primary.confidence,
@@ -421,7 +427,7 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
     const latencyMs = Math.max(11, Math.round(14 + (Date.now() - startTime) % 6));
 
     const primaryDet = {
-      id: `GV-SURF-${Date.now().toString().slice(-4)}`,
+      id: `GV-SURF-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
       title: `Surface Optical Detection (${filename})`,
       category: filteredBoxes[0]?.category || primaryCategory,
       source: source || 'DRONE',
@@ -683,25 +689,41 @@ Provide a concise 2-sentence marine scientific risk summary detailing ecological
   }
 });
 
-// 7. MarineSight AI Copilot AI Chat API (Supports both /api/copilot and /api/ai/copilot)
+// 7. MarineSight AI Copilot AI Chat API with RAG (Retrieval-Augmented Generation)
 const handleCopilotRequest = async (req: express.Request, res: express.Response) => {
   try {
     const message = req.body.message || req.body.prompt || '';
     const context = req.body.context || {};
+    const categoryFilter = req.body.category || 'ALL';
+    const userDocs = Array.isArray(req.body.userDocs) ? req.body.userDocs : [];
+
     if (!message) {
       return res.status(400).json({ error: 'Message or prompt is required' });
     }
 
-    const systemInstruction = `You are the MarineSight AI Copilot, an expert AI marine scientist and ocean operations coordinator for the MarineSight AI Marine Debris & Underwater Anomaly Intelligence Platform.
-Live Telemetry Context:
-- Active Incidents: ${context.activeIncidentsCount || 6} Critical / ${context.totalDetections || 52} Total Detections
-- Active Vessels: RV Sagar Guardian (On-Station Palk Bay), Patrol Craft Vajra-2, Dive Catamaran Coral Star
-- Core AI Engines: MarineSight AI SonarNet Ultra v2.4 (mAP 0.942), Surface-YOLOv9 SeaGuard (mAP 0.946), Bayesian GeoFusion v1.8
+    // Step 1: RAG Retrieval across indexed marine knowledge corpus + user-provided notes
+    const retrievedResults = searchRAGKnowledge(message, categoryFilter, 4, userDocs);
+    const { systemInstruction, augmentedPrompt } = buildRAGPrompt(message, retrievedResults);
 
-Provide concise, authoritative, scientifically grounded answers. Format recommendations with bold highlights and bullet points.`;
+    const ragMetadata = {
+      activeCorpusDocsCount: RAG_KNOWLEDGE_BASE.length + userDocs.length,
+      retrievedCount: retrievedResults.length,
+      retrievedDocs: retrievedResults.map(r => ({
+        id: r.doc.id,
+        title: r.doc.title,
+        category: r.doc.category,
+        score: r.score,
+        summary: r.doc.summary,
+        content: r.doc.content,
+        citations: r.doc.citations,
+        matchedSnippets: r.matchedSnippets
+      })),
+      topScore: retrievedResults[0]?.score || 0
+    };
 
+    // Step 2: Query Gemini with RAG augmented prompt
     const { text: replyText, modelUsed } = await generateWithGemini({
-      contents: message,
+      contents: augmentedPrompt,
       systemInstruction,
     });
 
@@ -710,25 +732,89 @@ Provide concise, authoritative, scientifically grounded answers. Format recommen
         success: true,
         reply: replyText.trim(),
         answer: replyText.trim(),
-        source: modelUsed || 'gemini-3.8-flash',
+        source: `${modelUsed || 'gemini-3.8-flash'} + RAG Grounding`,
+        rag: ragMetadata
       });
     }
 
-    const fallbackReply = getCopilotFallbackReply(message, context);
+    // Step 3: Grounded RAG Synthesis Fallback
+    const groundedAnswer = generateGroundedRAGAnswer(message, retrievedResults, context);
     return res.json({
       success: true,
-      reply: fallbackReply,
-      answer: fallbackReply,
-      source: 'domain-rule-engine-fallback',
+      reply: groundedAnswer,
+      answer: groundedAnswer,
+      source: 'MarineSight Grounded RAG Engine',
+      rag: ragMetadata
     });
   } catch (error: any) {
-    const fallbackReply = getCopilotFallbackReply(req.body?.message || '', req.body?.context || {});
-    res.json({ success: true, reply: fallbackReply, answer: fallbackReply, source: 'fallback-emergency' });
+    const fallbackResults = searchRAGKnowledge(req.body?.message || req.body?.prompt || '', 'ALL', 2, req.body?.userDocs || []);
+    const fallbackAnswer = generateGroundedRAGAnswer(req.body?.message || req.body?.prompt || '', fallbackResults, req.body?.context || {});
+    res.json({ 
+      success: true, 
+      reply: fallbackAnswer, 
+      answer: fallbackAnswer, 
+      source: 'MarineSight RAG Emergency Fallback',
+      rag: {
+        activeCorpusDocsCount: RAG_KNOWLEDGE_BASE.length + (req.body?.userDocs?.length || 0),
+        retrievedDocs: fallbackResults.map(r => ({
+          id: r.doc.id,
+          title: r.doc.title,
+          category: r.doc.category,
+          score: r.score,
+          summary: r.doc.summary,
+          content: r.doc.content,
+          citations: r.doc.citations
+        }))
+      }
+    });
   }
 };
 
 app.post('/api/ai/copilot', handleCopilotRequest);
 app.post('/api/copilot', handleCopilotRequest);
+
+// RAG Knowledge Base Exploration Endpoints
+app.get('/api/copilot/rag/corpus', (req, res) => {
+  res.json({
+    success: true,
+    totalDocuments: RAG_KNOWLEDGE_BASE.length,
+    categories: ['ALL', 'SONAR_ACOUSTICS', 'SYSTEM_USAGE', 'OPERATIONS_SALVAGE', 'INCIDENTS_FLEET', 'AUV_COMMUNICATIONS', 'REGULATIONS_ECOLOGY', 'ROLES_WORKFLOWS', 'SYSTEM_ARCHITECTURE', 'USER_NOTES'],
+    documents: RAG_KNOWLEDGE_BASE.map(d => ({
+      id: d.id,
+      title: d.title,
+      category: d.category,
+      tags: d.tags,
+      summary: d.summary,
+      content: d.content,
+      citations: d.citations,
+      sampleQuestions: d.sampleQuestions
+    }))
+  });
+});
+
+app.post('/api/copilot/rag/search', (req, res) => {
+  const { query = '', category = 'ALL', topK = 6, userDocs = [] } = req.body;
+  const parsedUserDocs = Array.isArray(userDocs) ? userDocs : [];
+  const results = searchRAGKnowledge(query, category, topK, parsedUserDocs);
+  res.json({
+    success: true,
+    query,
+    resultsCount: results.length,
+    results: results.map(r => ({
+      id: r.doc.id,
+      title: r.doc.title,
+      category: r.doc.category,
+      score: r.score,
+      summary: r.doc.summary,
+      content: r.doc.content,
+      contentSnippet: r.doc.content.slice(0, 320) + (r.doc.content.length > 320 ? '...' : ''),
+      citations: r.doc.citations,
+      tags: r.doc.tags,
+      sampleQuestions: r.doc.sampleQuestions,
+      matchedSnippets: r.matchedSnippets
+    }))
+  });
+});
 
 // 8. AI Detection Explanation API
 app.post('/api/ai/explain', async (req, res) => {
@@ -1047,7 +1133,7 @@ app.post('/api/fleet/dispatch', (req, res) => {
       return res.status(400).json({ error: 'incidentId and vesselId are required' });
     }
 
-    const missionId = `MSN-${Date.now().toString().slice(-4)}`;
+    const missionId = `MSN-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
     res.json({
       success: true,
       missionId,
@@ -1095,7 +1181,7 @@ app.post('/api/model/train', async (req, res) => {
       augmentations = ['mosaic', 'mixup', 'hsv_jitter', 'random_flip'],
     } = req.body;
 
-    const runId = `RUN-YOLO-${Date.now().toString().slice(-4)}`;
+    const runId = `RUN-YOLO-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
     const startTime = Date.now();
 
     // Generate epoch-by-epoch training telemetry progression
@@ -1208,9 +1294,9 @@ app.post('/api/model/deploy', (req, res) => {
     const { runId, modelName, map50, precision, recall, latencyMs } = req.body;
 
     activeDeployedYoloModel = {
-      id: runId || `DEPLOYED-${Date.now().toString().slice(-4)}`,
+      id: runId || `DEPLOYED-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
       name: modelName || 'YOLOv9-SeaGuard Active Trained Weights',
-      version: `v2.5-tuned-${Date.now().toString().slice(-4)}`,
+      version: `v2.5-tuned-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
       architecture: 'Fine-Tuned Marine YOLO (Enhanced Confidence & Clear Localization)',
       map50: Number(map50) || 96.8,
       map50_95: 84.5,
@@ -1427,7 +1513,7 @@ app.get('/api/detections', (req, res) => {
 
 app.post('/api/detections', (req, res) => {
   const newDet = {
-    id: req.body.id || `MSA-DET-${Date.now().toString().slice(-4)}`,
+    id: req.body.id || `MSA-DET-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
     modality: req.body.modality || 'SURFACE',
     class_name: req.body.class_name || req.body.category || 'Marine Debris',
     confidence: req.body.confidence || 0.9,
@@ -1461,8 +1547,8 @@ app.get('/api/incidents', (req, res) => {
 
 app.post('/api/incidents', (req, res) => {
   const newInc = {
-    id: req.body.id || `INC-${Date.now().toString().slice(-4)}`,
-    incident_code: req.body.incident_code || `INC-${Date.now().toString().slice(-4)}`,
+    id: req.body.id || `INC-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
+    incident_code: req.body.incident_code || `INC-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
     title: req.body.title || 'Marine Debris Hazard',
     category: req.body.category || 'Ghost Fishing Gear',
     severity: req.body.severity || 'HIGH',
@@ -1516,8 +1602,8 @@ app.get('/api/cleanup', (req, res) => {
 
 app.post('/api/cleanup/dispatch', (req, res) => {
   const newOp = {
-    id: `CLN-${Date.now().toString().slice(-4)}`,
-    operation_code: `CLN-${Date.now().toString().slice(-4)}`,
+    id: `CLN-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
+    operation_code: `CLN-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
     target_incident_id: req.body.incidentId || 'INC-8092',
     title: `Salvage Mission for ${req.body.debrisType || 'Ghost Fishing Gear'}`,
     vessel_id: req.body.vesselId || 'VES-01',
@@ -1622,7 +1708,7 @@ app.post('/api/datasets/upload-batch', (req, res) => {
   try {
     const {
       datasetId,
-      batchName = `BATCH-${Date.now().toString().slice(-4)}`,
+      batchName = `BATCH-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
       sensorType = 'SONAR_ACOUSTIC',
       format = 'COCO JSON',
       sampleCount = 240,
@@ -1649,7 +1735,7 @@ app.post('/api/datasets/upload-batch', (req, res) => {
         }
       });
       target.recentBatches.unshift({
-        batchId: `BATCH-${Date.now().toString().slice(-6)}`,
+        batchId: `BATCH-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
         name: batchName,
         samples: Number(sampleCount) || 100,
         format,
@@ -1675,7 +1761,7 @@ app.post('/api/datasets/upload-batch', (req, res) => {
         batchesCount: 1,
         recentBatches: [
           {
-            batchId: `BATCH-${Date.now().toString().slice(-6)}`,
+            batchId: `BATCH-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
             name: batchName,
             samples: Number(sampleCount) || 100,
             format,

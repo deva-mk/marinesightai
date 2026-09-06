@@ -955,12 +955,12 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
             })}
 
             {/* Individual Detections Pins (if layer active) */}
-            {layerDetections && filteredDetections.slice(0, 30).map((det) => {
+            {layerDetections && filteredDetections.slice(0, 30).map((det, idx) => {
               const pos = project(det.location.lat, det.location.lng);
               const isSelected = selectedTarget?.id === det.id;
               return (
                 <div
-                  key={`det-${det.id}`}
+                  key={`det-${det.id}-${idx}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSelectedTarget(det);

@@ -23,6 +23,7 @@ import {
   INITIAL_LIVE_STREAM,
   DEMO_USERS 
 } from '../data/sampleData';
+import { cryptoVault } from './cryptoVault';
 
 const STORAGE_KEYS = {
   DETECTIONS: 'gv_detections',
@@ -202,43 +203,56 @@ class MarineStorageService {
     this.notifyListeners();
   }
 
-  public login(email: string, password?: string): { success: boolean; user?: UserProfile; message: string } {
+  public isEmailRegistered(email: string): boolean {
+    if (!email) return false;
+    const cleanEmail = email.trim().toLowerCase();
+    const users = this.getRegisteredUsers();
+    return users.some(u => u.email.toLowerCase() === cleanEmail);
+  }
+
+  public getUserByEmail(email: string): (UserProfile & { clearance?: string }) | null {
+    if (!email) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const users = this.getRegisteredUsers();
+    const found = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!found) return null;
+    const { password, ...safeUser } = found;
+    return safeUser as UserProfile;
+  }
+
+  public login(email: string, password?: string): { success: boolean; notRegistered?: boolean; user?: UserProfile; message: string } {
     const users = this.getRegisteredUsers();
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password?.trim() || '';
 
-    // Find matched account
+    // 1. Check if email exists in database
     const matched = users.find(u => u.email.toLowerCase() === cleanEmail);
 
     if (!matched) {
-      // If it's a new email without registration, allow quick login if password is provided
-      if (cleanPass.length >= 4) {
-        const newUser: UserProfile & { password: string; clearance: string } = {
-          id: `usr-${Date.now().toString().slice(-4)}`,
-          name: email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          email: cleanEmail,
-          password: cleanPass,
-          role: 'MARINE_OPERATOR',
-          organization: 'MarineSight AI Coastal Fleet',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-          clearance: 'Level 3 (Operational Field Operator)',
-          status: 'ACTIVE',
-          token: `ms_tok_${Date.now()}`,
-          lastLogin: new Date().toISOString()
-        };
-        const updatedUsers = [...users, newUser];
-        localStorage.setItem(STORAGE_KEYS.REGISTERED_USERS, JSON.stringify(updatedUsers));
-        this.setCurrentUser(newUser);
-        localStorage.setItem(STORAGE_KEYS.IS_LOGGED_IN, 'true');
-        this.notifyListeners();
-        return { success: true, user: newUser, message: `Account created and signed in as ${newUser.name}!` };
-      }
-      return { success: false, message: 'Account not found. Please check your email or create an account.' };
+      return { 
+        success: false, 
+        notRegistered: true,
+        message: `Email "${cleanEmail}" is not registered. Please create a new account.` 
+      };
     }
 
-    // Check password if set
-    if (matched.password && cleanPass && matched.password !== cleanPass) {
-      return { success: false, message: 'Invalid password. Please verify your credentials or use a demo account.' };
+    // 2. Validate password
+    if (!cleanPass) {
+      return {
+        success: false,
+        notRegistered: false,
+        message: 'Please enter your password.'
+      };
+    }
+
+    // Check with encrypted hash & legacy fallback
+    const isPasswordValid = cryptoVault.verifyPassword(cleanPass, matched.password || '', cleanEmail);
+    if (!isPasswordValid) {
+      return { 
+        success: false, 
+        notRegistered: false,
+        message: 'Invalid password. Please enter the password you created for this account.' 
+      };
     }
 
     const updatedUser: UserProfile = {
@@ -267,21 +281,33 @@ class MarineStorageService {
   }): { success: boolean; user?: UserProfile; message: string } {
     const users = this.getRegisteredUsers();
     const cleanEmail = accountData.email.trim().toLowerCase();
+    const cleanName = accountData.name.trim();
 
     if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
-      return { success: false, message: 'An account with this email already exists. Please sign in.' };
+      return { success: false, message: `An account with "${cleanEmail}" already exists. Please sign in with your password.` };
     }
+
+    // High-security cryptographic password hashing (SHA-256 + email salt)
+    const hashedPassword = cryptoVault.hashPassword(accountData.password, cleanEmail);
 
     const newUser: UserProfile & { password: string; clearance: string } = {
       id: `usr-${Date.now().toString().slice(-6)}`,
-      name: accountData.name.trim(),
+      name: cleanName,
       email: cleanEmail,
-      password: accountData.password,
+      password: hashedPassword,
       role: accountData.role,
       organization: accountData.organization?.trim() || 'MarineSight AI Environmental Operations',
       avatarUrl: accountData.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-      phone: accountData.phone?.trim() || '+1 (555) 000-0000',
-      clearance: accountData.role === 'ADMIN' ? 'Level 5 (Super Administrator)' : accountData.role === 'MARINE_OPERATOR' ? 'Level 4 (Fleet Operator)' : 'Level 3 (Standard Clearance)',
+      phone: cryptoVault.encryptField(accountData.phone?.trim() || '+1 (555) 000-0000'),
+      clearance: accountData.role === 'ADMIN' 
+        ? 'Level 5 (Super Administrator)' 
+        : accountData.role === 'MARINE_OPERATOR' 
+        ? 'Level 4 (Fleet Operator)' 
+        : accountData.role === 'RESEARCHER'
+        ? 'Level 3 (Oceanographer & Acoustic Analyst)'
+        : accountData.role === 'CLEANUP_TEAM'
+        ? 'Level 3 (Salvage Squad Commander)'
+        : 'Level 1 (Public Observer)',
       status: 'ACTIVE',
       token: `ms_tok_${Date.now()}`,
       lastLogin: new Date().toISOString()
@@ -294,7 +320,7 @@ class MarineStorageService {
     localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, newUser.token || '');
     this.notifyListeners();
 
-    return { success: true, user: newUser, message: `Account created successfully for ${newUser.name}!` };
+    return { success: true, user: newUser, message: `Encrypted account created successfully for ${newUser.name}!` };
   }
 
   public logout(): void {
@@ -356,7 +382,28 @@ class MarineStorageService {
   public getDetections(): DetectionRecord[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.DETECTIONS);
-      return data ? JSON.parse(data) : SAMPLE_DETECTIONS;
+      const list: DetectionRecord[] = data ? JSON.parse(data) : SAMPLE_DETECTIONS;
+      if (!Array.isArray(list)) return SAMPLE_DETECTIONS;
+
+      const seen = new Set<string>();
+      const deduped: DetectionRecord[] = [];
+      let hadDuplicates = false;
+
+      for (const d of list) {
+        if (!d || typeof d !== 'object') continue;
+        const item: DetectionRecord = { ...d };
+        if (!item.id || seen.has(item.id)) {
+          hadDuplicates = true;
+          item.id = `GV-${item.id || 'DET'}-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+        }
+        seen.add(item.id);
+        deduped.push(item);
+      }
+
+      if (hadDuplicates && data) {
+        localStorage.setItem(STORAGE_KEYS.DETECTIONS, JSON.stringify(deduped));
+      }
+      return deduped;
     } catch {
       return SAMPLE_DETECTIONS;
     }
@@ -364,22 +411,28 @@ class MarineStorageService {
 
   public addDetection(detection: DetectionRecord): DetectionRecord {
     const list = this.getDetections();
-    const updated = [detection, ...list];
+    const finalDet: DetectionRecord = { ...detection };
+    if (!finalDet.id) {
+      finalDet.id = `GV-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+    // Remove any existing item with the same ID to prevent duplication
+    const filtered = list.filter(d => d.id !== finalDet.id);
+    const updated = [finalDet, ...filtered];
     localStorage.setItem(STORAGE_KEYS.DETECTIONS, JSON.stringify(updated));
 
-    // Also push to live stream
+    // Also push to live stream with guaranteed unique ID
     this.addLiveEvent({
-      id: `LIVE-${Date.now().toString().slice(-4)}`,
+      id: `LIVE-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: new Date().toTimeString().split(' ')[0],
-      source: detection.source,
-      category: detection.category,
-      confidence: detection.confidence,
-      location: detection.location.sector || detection.location.areaName,
-      severity: detection.severity
+      source: finalDet.source,
+      category: finalDet.category,
+      confidence: finalDet.confidence,
+      location: finalDet.location?.sector || finalDet.location?.areaName || 'Sector Grid',
+      severity: finalDet.severity
     });
 
     this.notifyListeners();
-    return detection;
+    return finalDet;
   }
 
   public verifyDetection(detectionId: string) {
@@ -393,7 +446,28 @@ class MarineStorageService {
   public getIncidents(): IncidentRecord[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.INCIDENTS);
-      return data ? JSON.parse(data) : SAMPLE_INCIDENTS;
+      const list: IncidentRecord[] = data ? JSON.parse(data) : SAMPLE_INCIDENTS;
+      if (!Array.isArray(list)) return SAMPLE_INCIDENTS;
+
+      const seen = new Set<string>();
+      const deduped: IncidentRecord[] = [];
+      let hadDuplicates = false;
+
+      for (const inc of list) {
+        if (!inc || typeof inc !== 'object') continue;
+        const item: IncidentRecord = { ...inc };
+        if (!item.id || seen.has(item.id)) {
+          hadDuplicates = true;
+          item.id = `INC-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+        }
+        seen.add(item.id);
+        deduped.push(item);
+      }
+
+      if (hadDuplicates && data) {
+        localStorage.setItem(STORAGE_KEYS.INCIDENTS, JSON.stringify(deduped));
+      }
+      return deduped;
     } catch {
       return SAMPLE_INCIDENTS;
     }
@@ -401,25 +475,30 @@ class MarineStorageService {
 
   public addIncident(incident: IncidentRecord): IncidentRecord {
     const list = this.getIncidents();
-    const updated = [incident, ...list];
+    const finalInc: IncidentRecord = { ...incident };
+    if (!finalInc.id) {
+      finalInc.id = `INC-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+    const filtered = list.filter(i => i.id !== finalInc.id);
+    const updated = [finalInc, ...filtered];
     localStorage.setItem(STORAGE_KEYS.INCIDENTS, JSON.stringify(updated));
 
     // Trigger an alert if Critical or High
-    if (incident.severity === 'CRITICAL' || incident.severity === 'HIGH') {
+    if (finalInc.severity === 'CRITICAL' || finalInc.severity === 'HIGH') {
       this.addAlert({
-        id: `ALT-${Date.now().toString().slice(-4)}`,
-        title: `${incident.severity}: ${incident.title}`,
-        message: `New ${incident.category} incident reported in ${incident.location.areaName}. Priority Score: ${incident.priorityScore}/100`,
-        type: incident.source === 'FUSION' ? 'FUSED_ALERT' : 'CRITICAL_DEBRIS',
-        severity: incident.severity,
+        id: `ALT-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
+        title: `${finalInc.severity}: ${finalInc.title}`,
+        message: `New ${finalInc.category} incident reported in ${finalInc.location.areaName}. Priority Score: ${finalInc.priorityScore}/100`,
+        type: finalInc.source === 'FUSION' ? 'FUSED_ALERT' : 'CRITICAL_DEBRIS',
+        severity: finalInc.severity,
         timestamp: new Date().toISOString(),
         isRead: false,
-        relatedIncidentId: incident.id
+        relatedIncidentId: finalInc.id
       });
     }
 
     this.notifyListeners();
-    return incident;
+    return finalInc;
   }
 
   public updateIncidentStatus(incidentId: string, status: IncidentRecord['status'], note?: string) {
@@ -463,7 +542,28 @@ class MarineStorageService {
   public getMissions(): CleanupMission[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.MISSIONS);
-      return data ? JSON.parse(data) : SAMPLE_CLEANUP_MISSIONS;
+      const list: CleanupMission[] = data ? JSON.parse(data) : SAMPLE_CLEANUP_MISSIONS;
+      if (!Array.isArray(list)) return SAMPLE_CLEANUP_MISSIONS;
+
+      const seen = new Set<string>();
+      const deduped: CleanupMission[] = [];
+      let hadDuplicates = false;
+
+      for (const m of list) {
+        if (!m || typeof m !== 'object') continue;
+        const item: CleanupMission = { ...m };
+        if (!item.id || seen.has(item.id)) {
+          hadDuplicates = true;
+          item.id = `MSN-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+        }
+        seen.add(item.id);
+        deduped.push(item);
+      }
+
+      if (hadDuplicates && data) {
+        localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(deduped));
+      }
+      return deduped;
     } catch {
       return SAMPLE_CLEANUP_MISSIONS;
     }
@@ -471,10 +571,15 @@ class MarineStorageService {
 
   public addMission(mission: CleanupMission): CleanupMission {
     const list = this.getMissions();
-    const updated = [mission, ...list];
+    const finalMission: CleanupMission = { ...mission };
+    if (!finalMission.id) {
+      finalMission.id = `MSN-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+    const filtered = list.filter(m => m.id !== finalMission.id);
+    const updated = [finalMission, ...filtered];
     localStorage.setItem(STORAGE_KEYS.MISSIONS, JSON.stringify(updated));
     this.notifyListeners();
-    return mission;
+    return finalMission;
   }
 
   public completeMission(missionId: string, debrisKg: number, highRiskCount: number, afterPhoto?: string) {
@@ -613,7 +718,28 @@ class MarineStorageService {
   public getAlerts(): AlertRecord[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ALERTS);
-      return data ? JSON.parse(data) : SAMPLE_ALERTS;
+      const list: AlertRecord[] = data ? JSON.parse(data) : SAMPLE_ALERTS;
+      if (!Array.isArray(list)) return SAMPLE_ALERTS;
+
+      const seen = new Set<string>();
+      const deduped: AlertRecord[] = [];
+      let hadDuplicates = false;
+
+      for (const a of list) {
+        if (!a || typeof a !== 'object') continue;
+        const item: AlertRecord = { ...a };
+        if (!item.id || seen.has(item.id)) {
+          hadDuplicates = true;
+          item.id = `ALT-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+        }
+        seen.add(item.id);
+        deduped.push(item);
+      }
+
+      if (hadDuplicates && data) {
+        localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(deduped));
+      }
+      return deduped;
     } catch {
       return SAMPLE_ALERTS;
     }
@@ -621,7 +747,12 @@ class MarineStorageService {
 
   public addAlert(alert: AlertRecord) {
     const list = this.getAlerts();
-    const updated = [alert, ...list];
+    const finalAlert: AlertRecord = { ...alert };
+    if (!finalAlert.id) {
+      finalAlert.id = `ALT-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+    }
+    const filtered = list.filter(a => a.id !== finalAlert.id);
+    const updated = [finalAlert, ...filtered];
     localStorage.setItem(STORAGE_KEYS.ALERTS, JSON.stringify(updated));
     this.notifyListeners();
   }
@@ -671,7 +802,28 @@ class MarineStorageService {
   public getLiveStream(): LiveStreamEvent[] {
     try {
       const data = localStorage.getItem(STORAGE_KEYS.LIVE_STREAM);
-      return data ? JSON.parse(data) : INITIAL_LIVE_STREAM;
+      const list: LiveStreamEvent[] = data ? JSON.parse(data) : INITIAL_LIVE_STREAM;
+      if (!Array.isArray(list)) return INITIAL_LIVE_STREAM;
+
+      const seen = new Set<string>();
+      const deduped: LiveStreamEvent[] = [];
+      let hadDuplicates = false;
+
+      for (const ev of list) {
+        if (!ev || typeof ev !== 'object') continue;
+        const item: LiveStreamEvent = { ...ev };
+        if (!item.id || seen.has(item.id)) {
+          hadDuplicates = true;
+          item.id = `LIVE-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+        }
+        seen.add(item.id);
+        deduped.push(item);
+      }
+
+      if (hadDuplicates && data) {
+        localStorage.setItem(STORAGE_KEYS.LIVE_STREAM, JSON.stringify(deduped));
+      }
+      return deduped;
     } catch {
       return INITIAL_LIVE_STREAM;
     }
@@ -679,14 +831,19 @@ class MarineStorageService {
 
   public addLiveEvent(event: LiveStreamEvent) {
     const list = this.getLiveStream();
-    const updated = [event, ...list].slice(0, 20); // keep last 20
+    const finalEvent: LiveStreamEvent = { ...event };
+    if (!finalEvent.id) {
+      finalEvent.id = `LIVE-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    }
+    const filtered = list.filter(e => e.id !== finalEvent.id);
+    const updated = [finalEvent, ...filtered].slice(0, 20); // keep last 20
     localStorage.setItem(STORAGE_KEYS.LIVE_STREAM, JSON.stringify(updated));
     this.notifyListeners();
   }
 
   // --- Sensor Simulator Trigger ---
   public triggerSimulationScan(type: 'SONAR' | 'DRONE' | 'CAMERA' | 'GPS' | 'FUSION'): DetectionRecord {
-    const idNum = Math.floor(1080 + Math.random() * 8000);
+    const idNum = `${Date.now().toString(36)}-${Math.floor(1000 + Math.random() * 9000)}`;
     const catMap: Record<string, string[]> = {
       SONAR: ['Ghost Fishing Gear', 'Derelict Crab Pot', 'Tire', 'Metal Debris'],
       DRONE: ['Plastic', 'Bottle', 'Can', 'Floating Debris'],

@@ -349,7 +349,7 @@ export const LiveSurfaceMonitoring: React.FC<{ onNavigate?: (view: string, id?: 
           )}
 
           {/* Real AI Bounding Box Overlays */}
-          {activeBoxes.map((box) => {
+          {activeBoxes.map((box, idx) => {
             // Coordinate mapping (600x400 normalized coordinate system to percentage)
             const leftPct = `${(box.x / 600) * 100}%`;
             const topPct = `${(box.y / 400) * 100}%`;
@@ -359,7 +359,7 @@ export const LiveSurfaceMonitoring: React.FC<{ onNavigate?: (view: string, id?: 
 
             return (
               <div 
-                key={box.id}
+                key={`box-overlay-${box.id || 'b'}-${idx}`}
                 style={{ left: leftPct, top: topPct, width: widthPct, height: heightPct }}
                 className={`absolute border-2 rounded-xl pointer-events-none transition-all duration-300 ${
                   isGhost 
@@ -439,7 +439,7 @@ export const LiveSurfaceMonitoring: React.FC<{ onNavigate?: (view: string, id?: 
 
               return (
                 <div 
-                  key={box.id}
+                  key={`box-item-${box.id || 'b'}-${idx}`}
                   className="p-3 rounded-xl bg-[#1E2522] border border-[#2D3934] space-y-1.5 text-xs text-gray-200"
                 >
                   <div className="flex items-center justify-between">

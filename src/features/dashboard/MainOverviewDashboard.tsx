@@ -264,9 +264,9 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
                   No incoming live stream packets.
                 </div>
               ) : (
-                safeLiveStream.slice(0, 5).map((evt) => (
+                safeLiveStream.slice(0, 5).map((evt, evtIdx) => (
                   <div 
-                    key={evt.id}
+                    key={`${evt.id}-${evtIdx}`}
                     onClick={() => onNavigate('fusion')}
                     className="p-3 rounded-2xl bg-[#0C0D0E] hover:bg-[#1A1C22] border border-[#20232A] hover:border-[#FFFF23]/40 flex items-center justify-between cursor-pointer transition-all text-left"
                   >
@@ -433,8 +433,8 @@ export const MainOverviewDashboard: React.FC<MainOverviewDashboardProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredRecent.map((d) => (
-                  <tr key={d.id} className="hover:bg-[#181A20] transition-colors">
+                filteredRecent.map((d, dIdx) => (
+                  <tr key={`${d.id}-${dIdx}`} className="hover:bg-[#181A20] transition-colors">
                     <td className="py-3 px-3 font-mono font-bold text-[#FFFF23]">{d.id}</td>
                     <td className="py-3 px-3 font-bold text-white">{d.category}</td>
                     <td className="py-3 px-3">
