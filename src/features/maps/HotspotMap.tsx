@@ -32,11 +32,15 @@ import {
   Waves,
   Target,
   LocateFixed,
-  Map as MapIcon
+  Map as MapIcon,
+  Globe,
+  Database,
+  Cpu
 } from 'lucide-react';
 import { DetectionRecord, IncidentRecord, HotspotRecord, CleanupMission, DroneMission } from '../../types';
 import { SAMPLE_DRONE_MISSIONS } from '../../data/sampleData';
 import { LeafletOceanMap } from './LeafletOceanMap';
+import { MapLayerKey, GOOGLE_MAP_LAYERS } from './oceanMapSolutionsData';
 
 interface HotspotMapProps {
   detections?: DetectionRecord[];
@@ -61,63 +65,63 @@ interface SectorPreset {
 const SECTOR_PRESETS: SectorPreset[] = [
   {
     id: 'ALL',
-    name: 'Auto-Fit All Sectors (Full Coastal Corridor)',
+    name: 'Auto-Fit All Sectors (Gulf of Mannar & Palk Bay)',
     code: 'OVERALL',
-    minLat: 10.9250,
-    maxLat: 10.9850,
-    minLng: 78.0550,
-    maxLng: 78.1050,
-    description: 'Dynamic auto-framing of all marine hotspots, sonar detections, and aerial observations.'
+    minLat: 9.1500,
+    maxLat: 9.3500,
+    minLng: 79.1100,
+    maxLng: 79.4400,
+    description: 'Dynamic auto-framing of all marine sanctuaries, coral shoals, and coastal debris corridors.'
   },
   {
     id: 'SEC-4B',
     name: 'Sector 4B - Sanctuary Coral Core',
     code: 'SEC-4B',
-    minLat: 10.9450,
-    maxLat: 10.9620,
-    minLng: 78.0730,
-    maxLng: 78.0890,
-    description: 'High-density ghost net hotspot with critical benthic marine life entanglement risks.'
+    minLat: 9.2150,
+    maxLat: 9.2600,
+    minLng: 79.2000,
+    maxLng: 79.2700,
+    description: 'High-density ghost net hotspot around Kurusadai and Shingle coral reef ecosystems.'
   },
   {
     id: 'SEC-4A',
-    name: 'Sector 4A - Palk Strait Convergence',
+    name: 'Sector 4A - Palk Bay North Convergence',
     code: 'SEC-4A',
-    minLat: 10.9520,
-    maxLat: 10.9680,
-    minLng: 78.0700,
-    maxLng: 78.0880,
+    minLat: 9.3000,
+    maxLat: 9.3600,
+    minLng: 79.2400,
+    maxLng: 79.3200,
     description: 'Strong tidal surface rips and microplastic vortex accumulating buoyant polymers.'
   },
   {
     id: 'SEC-5',
-    name: 'Sector 5 - Anchorage Deep Trench',
+    name: 'Sector 5 - Dhanushkodi Sandspit Trench',
     code: 'SEC-5',
-    minLat: 10.9300,
-    maxLat: 10.9480,
-    minLng: 78.0800,
-    maxLng: 78.0990,
-    description: 'Deep bathymetric sand shelf with industrial metal containers and heavy vessel debris.'
+    minLat: 9.1500,
+    maxLat: 9.2000,
+    minLng: 79.3700,
+    maxLng: 79.4400,
+    description: 'Deep bathymetric sand shelf facing Adam\'s Bridge with heavy vessel and cargo debris.'
   },
   {
     id: 'SEC-3',
-    name: 'Sector 3 - Outer Barrier Pinnacles',
+    name: 'Sector 3 - Pamban Pass & Rail Channel',
     code: 'SEC-3',
-    minLat: 10.9550,
-    maxLat: 10.9720,
-    minLng: 78.0670,
-    maxLng: 78.0830,
-    description: 'Shallow reef crest subject to discarded longlines and monofilament snagging.'
+    minLat: 9.2650,
+    maxLat: 9.2950,
+    minLng: 79.1850,
+    maxLng: 79.2350,
+    description: 'Tidal ship channel under historic Pamban cantilever bridge subject to monofilament snagging.'
   },
   {
     id: 'SEC-2',
-    name: 'Sector 2 - Heritage Shoals',
+    name: 'Sector 2 - Mandapam Marine Observatory',
     code: 'SEC-2',
-    minLat: 10.9630,
-    maxLat: 10.9800,
-    minLng: 78.0600,
-    maxLng: 78.0760,
-    description: 'Historical shallow navigation channel with submerged timber anomalies.'
+    minLat: 9.2550,
+    maxLat: 9.2950,
+    minLng: 79.1100,
+    maxLng: 79.1700,
+    description: 'Fisheries landing and acoustic observatory station with harbour approach shoals.'
   }
 ];
 
@@ -133,13 +137,13 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
   const safeIncidents = incidents || [];
   const safeMissions = missions || [];
 
-  // Default initial hotspot
+  // Default initial hotspot in Gulf of Mannar Sanctuary
   const defaultHotspot: HotspotRecord = safeHotspots[0] || {
     id: 'HS-01',
     name: 'Mannar Sanctuary Benthic Gyre',
     sector: 'Sector 4B',
-    centerLat: 10.9541,
-    centerLng: 78.0812,
+    centerLat: 9.2250,
+    centerLng: 79.2450,
     radiusMeters: 450,
     detectionCount: 19,
     dominantCategory: 'Ghost Fishing Gear',
@@ -151,6 +155,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
 
   // State Management
   const [mapEngine, setMapEngine] = useState<'LEAFLET' | 'TACTICAL'>('LEAFLET');
+  const [activeLayer, setActiveLayer] = useState<MapLayerKey>('google_hybrid');
   const [selectedTarget, setSelectedTarget] = useState<any>(defaultHotspot);
   const [selectedTargetType, setSelectedTargetType] = useState<'HOTSPOT' | 'INCIDENT' | 'DETECTION' | 'CUSTOM'>('HOTSPOT');
   const [activeSector, setActiveSector] = useState<string>('ALL');
@@ -167,18 +172,18 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
   const [layerDensityHeatmap, setLayerDensityHeatmap] = useState<boolean>(true);
   const [layerBathymetryGrid, setLayerBathymetryGrid] = useState<boolean>(true);
 
-  // User GPS & Custom Pin State
+  // User GPS & Custom Pin State (Centered on Vessel RV Poseidon in Gulf of Mannar)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number; isLiveGPS: boolean; accuracy?: number }>({ 
-    lat: 10.9541, 
-    lng: 78.0812,
+    lat: 9.2550, 
+    lng: 79.2350,
     isLiveGPS: false 
   });
   const [customPin, setCustomPin] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState<boolean>(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [isManualInputOpen, setIsManualInputOpen] = useState<boolean>(false);
-  const [manualLat, setManualLat] = useState<string>('10.9541');
-  const [manualLng, setManualLng] = useState<string>('78.0812');
+  const [manualLat, setManualLat] = useState<string>('9.2550');
+  const [manualLng, setManualLng] = useState<string>('79.2350');
 
   // Zoom & Pan State
   const [zoomLevel, setZoomLevel] = useState<number>(1);
@@ -599,6 +604,78 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
         </div>
       )}
 
+      {/* Map Solutions Showcase (MapTiler Ocean, Esri Living Atlas, Marine Debris Tracker, NASA IMPACT ML) */}
+      <div className="bg-[#12141A] rounded-2xl p-4 border border-[#262A36] shadow-xl text-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#2DD4BF] animate-pulse" />
+            <h2 className="text-xs font-mono font-black tracking-wider uppercase text-white">
+              Integrated Marine Mapping Solutions
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-[#2DD4BF]/15 text-[#2DD4BF] border border-[#2DD4BF]/30">
+              Open-Access Integrated Solutions • Zero Setup Required
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {Object.values(OCEAN_MAP_SOLUTIONS).map((sol) => {
+            const isSelected = activeSolution === sol.id;
+            return (
+              <button
+                key={sol.id}
+                onClick={() => {
+                  setActiveSolution(sol.id);
+                  if (mapEngine !== 'LEAFLET') setMapEngine('LEAFLET');
+                }}
+                className={`p-3.5 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                  isSelected
+                    ? 'bg-[#1A202C] shadow-lg scale-[1.02]'
+                    : 'bg-[#0E1015] hover:bg-[#161922] border-white/10'
+                }`}
+                style={{
+                  borderColor: isSelected ? sol.accentColor : 'rgba(255,255,255,0.1)',
+                  boxShadow: isSelected ? `0 0 15px ${sol.accentColor}25` : undefined
+                }}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span 
+                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
+                      style={{ backgroundColor: `${sol.accentColor}20`, color: sol.accentColor }}
+                    >
+                      {sol.badge}
+                    </span>
+                    <span className="text-[10px] font-mono text-stone-400">{sol.formatIntegration}</span>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    {sol.id === 'maptiler_ocean' && <Waves className="w-4 h-4 text-[#2DD4BF]" />}
+                    {sol.id === 'esri_living_atlas' && <Globe className="w-4 h-4 text-[#38BDF8]" />}
+                    {sol.id === 'debris_tracker' && <Database className="w-4 h-4 text-[#FFFF23]" />}
+                    {sol.id === 'nasa_impact_ml' && <Cpu className="w-4 h-4 text-[#F43F5E]" />}
+                    <span>{sol.name}</span>
+                  </h3>
+
+                  <p className="text-xs text-stone-300 font-semibold mt-1">
+                    {sol.bestUsedFor}
+                  </p>
+                </div>
+
+                <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between text-[11px] font-mono">
+                  <span className="text-stone-400">Live Active</span>
+                  <span className="font-bold" style={{ color: sol.accentColor }}>
+                    {isSelected ? '● SELECTED' : 'Switch Layer →'}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Sector Preset Focus Buttons */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="font-bold text-[#5C5449] flex items-center gap-1">
@@ -742,6 +819,8 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
         {mapEngine === 'LEAFLET' ? (
           <div className="lg:col-span-8 flex flex-col">
             <LeafletOceanMap
+              key={activeSolution}
+              initialSolution={activeSolution}
               detections={filteredDetections}
               incidents={filteredIncidents}
               hotspots={safeHotspots}
