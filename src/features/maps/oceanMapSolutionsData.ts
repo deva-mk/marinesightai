@@ -1,7 +1,7 @@
 // Google Maps Experience & Ocean Mapping Layers for MarineSight AI
 // 100% Pre-configured with zero API key requirement, fully accurate Gulf of Mannar & Palk Strait coordinates.
 
-export type MapLayerKey = 'google_hybrid' | 'google_roadmap' | 'google_terrain' | 'nautical_ocean';
+export type MapLayerKey = 'google_hybrid' | 'google_roadmap' | 'google_terrain' | 'nautical_ocean' | 'dark_matter' | 'osm_marine';
 
 export interface MapLayerMetadata {
   id: MapLayerKey;
@@ -68,6 +68,34 @@ export const GOOGLE_MAP_LAYERS: Record<MapLayerKey, MapLayerMetadata> = {
       'Navigation fairways & sanctuary sectors',
       'Sea surface temperature thermal zones',
       'Lagrangian ocean current drift vectors'
+    ]
+  },
+  dark_matter: {
+    id: 'dark_matter',
+    name: 'CartoDB Dark Matter',
+    category: 'Tactical Night Radar',
+    badge: 'DARK RADAR',
+    accentColor: '#818CF8',
+    description: 'Sleek dark-mode tactical map providing maximum contrast for neon debris markers, sonar pings, and thermal heatmaps.',
+    features: [
+      'High-contrast dark canvas for thermal overlays',
+      'Minimalist coastal outlines and bathymetry',
+      'Reduced glare for nocturnal bridge operations',
+      'Vivid glowing debris and vessel icons'
+    ]
+  },
+  osm_marine: {
+    id: 'osm_marine',
+    name: 'OpenStreetMap Coastal',
+    category: 'Open Marine Cartography',
+    badge: 'OSM COASTAL',
+    accentColor: '#F59E0B',
+    description: 'Community-verified coastal topography, harbour jetties, tidal creeks, and maritime navigation channels.',
+    features: [
+      'Crowdsourced coastal shoreline and pier structures',
+      'Marine conservation sector delineations',
+      'Fishing harbours and anchorage points',
+      'Zero rate limits with fast tile delivery'
     ]
   }
 };

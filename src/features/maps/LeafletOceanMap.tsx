@@ -258,15 +258,25 @@ export const LeafletOceanMap: React.FC<LeafletOceanMapProps> = ({
     } else if (activeLayer === 'nautical_ocean') {
       // Esri World Ocean Basemap: Specialized marine bathymetry
       tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}';
+    } else if (activeLayer === 'dark_matter') {
+      // CartoDB Dark Matter: Sleek tactical dark ocean radar
+      tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    } else if (activeLayer === 'osm_marine') {
+      // OpenStreetMap Coastal Navigation
+      tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     }
 
     if ((map as any)._baseTileLayer) {
       map.removeLayer((map as any)._baseTileLayer);
     }
 
+    const subdomains = (activeLayer === 'dark_matter' || activeLayer === 'osm_marine') 
+      ? ['a', 'b', 'c', 'd'] 
+      : ['mt0', 'mt1', 'mt2', 'mt3'];
+
     const newBaseLayer = L.tileLayer(tileUrl, {
       maxZoom: 20,
-      subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
+      subdomains
     }).addTo(map);
 
     (map as any)._baseTileLayer = newBaseLayer;
@@ -759,6 +769,34 @@ export const LeafletOceanMap: React.FC<LeafletOceanMapProps> = ({
           >
             <Waves className="w-3.5 h-3.5" />
             <span>Nautical</span>
+          </button>
+
+          <button
+            id="layer-dark-matter"
+            onClick={() => setActiveLayer('dark_matter')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeLayer === 'dark_matter'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+            }`}
+            title="CartoDB Dark Matter: High-contrast night tactical mode"
+          >
+            <Radio className="w-3.5 h-3.5" />
+            <span>Dark Radar</span>
+          </button>
+
+          <button
+            id="layer-osm-marine"
+            onClick={() => setActiveLayer('osm_marine')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeLayer === 'osm_marine'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+            }`}
+            title="OpenStreetMap Coastal: Coastline and harbour navigation"
+          >
+            <Anchor className="w-3.5 h-3.5" />
+            <span>OSM Coastal</span>
           </button>
 
           <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-1" />

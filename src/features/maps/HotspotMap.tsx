@@ -156,6 +156,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
   // State Management
   const [mapEngine, setMapEngine] = useState<'LEAFLET' | 'TACTICAL'>('LEAFLET');
   const [activeLayer, setActiveLayer] = useState<MapLayerKey>('google_hybrid');
+  const [isExpandedMap, setIsExpandedMap] = useState<boolean>(false);
   const [selectedTarget, setSelectedTarget] = useState<any>(defaultHotspot);
   const [selectedTargetType, setSelectedTargetType] = useState<'HOTSPOT' | 'INCIDENT' | 'DETECTION' | 'CUSTOM'>('HOTSPOT');
   const [activeSector, setActiveSector] = useState<string>('ALL');
@@ -350,18 +351,18 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
         (err) => {
           console.warn('Geolocation access fallback to station coordinates:', err.message);
           setUserLocation({ 
-            lat: 10.9541, 
-            lng: 78.0812, 
+            lat: 9.2550, 
+            lng: 79.2350, 
             isLiveGPS: false 
           });
-          setGpsError('Browser GPS restricted. Defaulted to Vessel RV Poseidon Anchor station (10.9541°N, 78.0812°E).');
+          setGpsError('Browser GPS restricted. Defaulted to Vessel RV Poseidon Anchor station (9.2550°N, 79.2350°E).');
           setLocating(false);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
       );
     } else {
-      setUserLocation({ lat: 10.9541, lng: 78.0812, isLiveGPS: false });
-      setGpsError('Geolocation is not supported in this environment. Using Vessel RV Poseidon Anchor.');
+      setUserLocation({ lat: 9.2550, lng: 79.2350, isLiveGPS: false });
+      setGpsError('Geolocation is not supported in this environment. Using Vessel RV Poseidon Anchor (9.2550°N, 79.2350°E).');
       setLocating(false);
     }
   };
@@ -452,8 +453,8 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
   }, [safeDetections, categoryFilter, severityFilter]);
 
   // Target coordinates for distance/bearing calculations
-  const targetLat = selectedTarget?.centerLat ?? selectedTarget?.location?.lat ?? 10.9541;
-  const targetLng = selectedTarget?.centerLng ?? selectedTarget?.location?.lng ?? 78.0812;
+  const targetLat = selectedTarget?.centerLat ?? selectedTarget?.location?.lat ?? 9.2250;
+  const targetLng = selectedTarget?.centerLng ?? selectedTarget?.location?.lng ?? 79.2450;
   const distKm = getDistanceKm(userLocation.lat, userLocation.lng, targetLat, targetLng);
   const distNm = (distKm * 0.539957).toFixed(2);
   const bearing = getBearing(userLocation.lat, userLocation.lng, targetLat, targetLng);
@@ -490,10 +491,10 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 mapEngine === 'LEAFLET' ? 'bg-[#FF6F59] text-white shadow-xs' : 'text-[#5C5449] hover:text-[#2A2A2A]'
               }`}
-              title="Interactive Leaflet & React-Leaflet GIS engine with real ocean bathymetric tiles and GPS tracks"
+              title="Interactive Leaflet & Google Maps GIS engine with real ocean bathymetric tiles and GPS tracks"
             >
               <Compass className="w-3.5 h-3.5" />
-              <span>Leaflet Engine</span>
+              <span>Google Maps GIS</span>
             </button>
             <button
               onClick={() => setMapEngine('TACTICAL')}
@@ -506,6 +507,19 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
               <span>Tactical Grid</span>
             </button>
           </div>
+
+          <button
+            onClick={() => setIsExpandedMap(!isExpandedMap)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+              isExpandedMap
+                ? 'bg-[#2A2A2A] text-white'
+                : 'bg-white border border-[#DDD5C7] text-[#5C5449] hover:bg-[#F2EDE4]'
+            }`}
+            title={isExpandedMap ? 'Switch to Standard Map with Inspector' : 'Expand to Full-Width Canvas'}
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>{isExpandedMap ? 'Standard View' : 'Full Canvas'}</span>
+          </button>
 
           <button
             onClick={handleLocateMe}
@@ -551,7 +565,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
                 value={manualLat}
                 onChange={(e) => setManualLat(e.target.value)}
                 className="w-28 px-2.5 py-1.5 rounded-lg bg-white border border-[#DDD5C7] font-mono font-bold text-xs"
-                placeholder="10.9541"
+                placeholder="9.2550"
                 required
               />
               <span className="text-xs font-bold text-[#736B5E]">°N</span>
@@ -565,7 +579,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
                 value={manualLng}
                 onChange={(e) => setManualLng(e.target.value)}
                 className="w-28 px-2.5 py-1.5 rounded-lg bg-white border border-[#DDD5C7] font-mono font-bold text-xs"
-                placeholder="78.0812"
+                placeholder="79.2350"
                 required
               />
               <span className="text-xs font-bold text-[#736B5E]">°E</span>
@@ -604,70 +618,71 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
         </div>
       )}
 
-      {/* Map Solutions Showcase (MapTiler Ocean, Esri Living Atlas, Marine Debris Tracker, NASA IMPACT ML) */}
+      {/* Google Maps Photorealistic & Ocean Hotspot Layers (Zero API Key Needed) */}
       <div className="bg-[#12141A] rounded-2xl p-4 border border-[#262A36] shadow-xl text-white">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#2DD4BF] animate-pulse" />
             <h2 className="text-xs font-mono font-black tracking-wider uppercase text-white">
-              Integrated Marine Mapping Solutions
+              Google Maps & Ocean Hotspot Layers
             </h2>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold bg-[#2DD4BF]/15 text-[#2DD4BF] border border-[#2DD4BF]/30">
-              Open-Access Integrated Solutions • Zero Setup Required
+              Photorealistic Satellite, Roadmap, Terrain & Bathymetry • No API Key Required
             </span>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {Object.values(OCEAN_MAP_SOLUTIONS).map((sol) => {
-            const isSelected = activeSolution === sol.id;
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {Object.values(GOOGLE_MAP_LAYERS).map((layer) => {
+            const isSelected = activeLayer === layer.id && mapEngine === 'LEAFLET';
             return (
               <button
-                key={sol.id}
+                key={layer.id}
                 onClick={() => {
-                  setActiveSolution(sol.id);
+                  setActiveLayer(layer.id);
                   if (mapEngine !== 'LEAFLET') setMapEngine('LEAFLET');
                 }}
-                className={`p-3.5 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+                className={`p-3 rounded-xl text-left transition-all border cursor-pointer relative overflow-hidden flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-[#1A202C] shadow-lg scale-[1.02]'
+                    ? 'bg-[#1A202C] shadow-lg ring-2 ring-emerald-500/50 scale-[1.02]'
                     : 'bg-[#0E1015] hover:bg-[#161922] border-white/10'
                 }`}
                 style={{
-                  borderColor: isSelected ? sol.accentColor : 'rgba(255,255,255,0.1)',
-                  boxShadow: isSelected ? `0 0 15px ${sol.accentColor}25` : undefined
+                  borderColor: isSelected ? layer.accentColor : 'rgba(255,255,255,0.1)',
+                  boxShadow: isSelected ? `0 0 15px ${layer.accentColor}25` : undefined
                 }}
               >
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <div className="flex items-center justify-between gap-1.5 mb-1.5">
                     <span 
-                      className="px-2 py-0.5 rounded text-[10px] font-mono font-bold"
-                      style={{ backgroundColor: `${sol.accentColor}20`, color: sol.accentColor }}
+                      className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold"
+                      style={{ backgroundColor: `${layer.accentColor}20`, color: layer.accentColor }}
                     >
-                      {sol.badge}
+                      {layer.badge}
                     </span>
-                    <span className="text-[10px] font-mono text-stone-400">{sol.formatIntegration}</span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
-                    {sol.id === 'maptiler_ocean' && <Waves className="w-4 h-4 text-[#2DD4BF]" />}
-                    {sol.id === 'esri_living_atlas' && <Globe className="w-4 h-4 text-[#38BDF8]" />}
-                    {sol.id === 'debris_tracker' && <Database className="w-4 h-4 text-[#FFFF23]" />}
-                    {sol.id === 'nasa_impact_ml' && <Cpu className="w-4 h-4 text-[#F43F5E]" />}
-                    <span>{sol.name}</span>
+                  <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    {layer.id === 'google_hybrid' && <Globe className="w-3.5 h-3.5 text-[#22C55E] shrink-0" />}
+                    {layer.id === 'google_roadmap' && <MapIcon className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />}
+                    {layer.id === 'google_terrain' && <Compass className="w-3.5 h-3.5 text-[#EAB308] shrink-0" />}
+                    {layer.id === 'nautical_ocean' && <Waves className="w-3.5 h-3.5 text-[#2DD4BF] shrink-0" />}
+                    {layer.id === 'dark_matter' && <Radio className="w-3.5 h-3.5 text-[#818CF8] shrink-0" />}
+                    {layer.id === 'osm_marine' && <Anchor className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />}
+                    <span className="truncate">{layer.name.replace('Google ', '')}</span>
                   </h3>
 
-                  <p className="text-xs text-stone-300 font-semibold mt-1">
-                    {sol.bestUsedFor}
+                  <p className="text-[11px] text-stone-300 font-medium mt-1 line-clamp-2">
+                    {layer.description}
                   </p>
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-between text-[11px] font-mono">
-                  <span className="text-stone-400">Live Active</span>
-                  <span className="font-bold" style={{ color: sol.accentColor }}>
-                    {isSelected ? '● SELECTED' : 'Switch Layer →'}
+                <div className="mt-2.5 pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-stone-400">Layer</span>
+                  <span className="font-bold" style={{ color: layer.accentColor }}>
+                    {isSelected ? '● ACTIVE' : 'Select →'}
                   </span>
                 </div>
               </button>
@@ -815,12 +830,12 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
       {/* Main Map Canvas & Dynamic Inspector */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Map Stage (8 Cols) */}
+        {/* Map Stage */}
         {mapEngine === 'LEAFLET' ? (
-          <div className="lg:col-span-8 flex flex-col">
+          <div className={`${isExpandedMap ? 'lg:col-span-12' : 'lg:col-span-8'} flex flex-col`}>
             <LeafletOceanMap
-              key={activeSolution}
-              initialSolution={activeSolution}
+              key={activeLayer}
+              initialLayer={activeLayer}
               detections={filteredDetections}
               incidents={filteredIncidents}
               hotspots={safeHotspots}
@@ -838,7 +853,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
             />
           </div>
         ) : (
-          <div className="lg:col-span-8 bg-[#0F1713] rounded-3xl border border-[#273830] p-4 shadow-xl text-white relative min-h-[600px] flex flex-col justify-between overflow-hidden">
+          <div className={`${isExpandedMap ? 'lg:col-span-12' : 'lg:col-span-8'} bg-[#0F1713] rounded-3xl border border-[#273830] p-4 shadow-xl text-white relative min-h-[600px] flex flex-col justify-between overflow-hidden`}>
           
           {/* Top Floating Radar Metadata Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 z-20">
@@ -1009,7 +1024,7 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
 
             {/* Cleanup Salvage Vessel Real Positions */}
             {layerCleanupVessels && safeMissions.map((msn) => {
-              const startCoords = msn.routeCoordinates?.[0] || [10.9500, 78.0800];
+              const startCoords = msn.routeCoordinates?.[0] || [9.2550, 79.2350];
               const pos = project(startCoords[0], startCoords[1]);
               return (
                 <div
@@ -1213,8 +1228,8 @@ export const HotspotMap: React.FC<HotspotMapProps> = ({
         </div>
         )}
 
-        {/* Selected Target Inspector Panel (4 Cols) */}
-        <div className="lg:col-span-4 space-y-4">
+        {/* Selected Target Inspector Panel */}
+        <div className={`${isExpandedMap ? 'lg:col-span-12' : 'lg:col-span-4'} space-y-4`}>
           {selectedTarget ? (
             <div className="bg-white p-6 rounded-3xl border border-[#E8E1D5] shadow-xs space-y-5">
               
