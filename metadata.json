@@ -3,6 +3,7 @@
   "description": "AI-Powered Marine Debris & Underwater Anomaly Intelligence Platform combining side-scan sonar, surface computer vision, drone tracking, and multimodal fusion.",
   "requestFramePermissions": [
     "camera",
+    "microphone",
     "geolocation"
   ],
   "majorCapabilities": [

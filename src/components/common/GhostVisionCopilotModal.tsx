@@ -4,7 +4,8 @@ import {
   Waves, BookOpen, CheckCircle2, ExternalLink, Cpu, HelpCircle, 
   Layers, Search, FileText, PlusCircle, Trash2, Filter, ArrowRight, 
   ChevronDown, ChevronUp, Hash, Zap, BookMarked, Clock, Sliders, 
-  Eye, RefreshCw, AlertCircle, Check, Anchor, Radio, Info
+  Eye, RefreshCw, AlertCircle, Check, Anchor, Radio, Info,
+  Mic, MicOff, Volume2, VolumeX, MapPin, Globe
 } from 'lucide-react';
 import { IncidentRecord, DetectionRecord, CleanupMission } from '../../types';
 import { 
@@ -17,6 +18,13 @@ import {
   saveUserRAGDoc,
   deleteUserRAGDoc
 } from '../../services/ragKnowledge';
+import { LiveVoiceClient } from '../../services/liveVoiceClient';
+import { apiService } from '../../services/apiService';
+
+interface GroundingLink {
+  title: string;
+  uri: string;
+}
 
 interface Citation {
   id: string;
@@ -34,9 +42,12 @@ interface Message {
   text: string;
   timestamp: string;
   source?: string;
+  modelUsed?: string;
   ragGrounded?: boolean;
   citations?: Citation[];
   retrievedDocsCount?: number;
+  searchLinks?: GroundingLink[];
+  mapLinks?: GroundingLink[];
 }
 
 export interface GhostVisionCopilotModalProps {
@@ -45,8 +56,41 @@ export interface GhostVisionCopilotModalProps {
   incidents?: IncidentRecord[];
   detections?: DetectionRecord[];
   missions?: CleanupMission[];
-  initialTab?: 'chat' | 'search' | 'userDocs' | 'usageGuides';
+  initialTab?: 'chat' | 'voice' | 'maps' | 'search' | 'userDocs' | 'usageGuides';
 }
+
+export const COPILOT_ROLES = [
+  {
+    id: 'commander',
+    name: 'Marine Salvage Lead',
+    description: 'Expert on ghost net recovery, dive safety protocols, and subsea lifting bags',
+    systemInstruction: 'You are MarineSight AI Marine Salvage Lead. You provide decisive, highly technical operational guidance on ghost net retrieval, ROV manipulator maneuvering, pneumatic lift calculations, and dive safety in the Gulf of Mannar.'
+  },
+  {
+    id: 'physicist',
+    name: 'Sonar Hydrographic Physicist',
+    description: 'Specialist in 455/900 kHz acoustic shadows, layback calculations, and bathymetry',
+    systemInstruction: 'You are MarineSight AI Sonar Hydrographic Physicist. You specialize in side-scan sonar acoustics, acoustic shadow trigonometry (H = L * A / R), slant-range correction, towfish geometry, and underwater acoustic propagation.'
+  },
+  {
+    id: 'ecologist',
+    name: 'Gulf of Mannar Ecologist',
+    description: 'Specialist in coral reef health, Dugong dugon habitats, and marine biosphere laws',
+    systemInstruction: 'You are MarineSight AI Marine Ecologist for the Gulf of Mannar Biosphere Reserve and Palk Bay. You provide authoritative insight on coral reef preservation, dugong and sea turtle protection, microplastic biodegradation, and environmental regulations.'
+  },
+  {
+    id: 'dispatcher',
+    name: 'Fleet Drone Dispatcher',
+    description: 'Coordinates autonomous surface vessels (ASVs), aerial UAVs, and underwater AUVs',
+    systemInstruction: 'You are MarineSight AI Fleet Dispatcher. You optimize autonomous survey tracklines, lawn-mower survey patterns, battery endurance management, and multi-asset coordinate dispatch.'
+  }
+];
+
+export const GEMINI_MODELS = [
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', badge: 'Recommended', desc: 'Fast, multimodal, supports Search & Maps grounding' },
+  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', badge: 'Deep Reasoning', desc: 'Best for complex calculations and multi-step salvage strategy' },
+  { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite', badge: 'Ultra Fast', desc: 'Lowest latency for rapid situational Q&A' }
+];
 
 export const GhostVisionCopilotModal: React.FC<GhostVisionCopilotModalProps> = ({
   isOpen,
@@ -57,12 +101,32 @@ export const GhostVisionCopilotModal: React.FC<GhostVisionCopilotModalProps> = (
   initialTab = 'chat'
 }) => {
   // Navigation Tabs
-  const [activeTab, setActiveTab] = useState<'chat' | 'search' | 'userDocs' | 'usageGuides'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'chat' | 'voice' | 'maps' | 'search' | 'userDocs' | 'usageGuides'>(initialTab);
   
+  // Gemini AI Chatbot Config state
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-3.5-flash');
+  const [selectedRole, setSelectedRole] = useState<string>('commander');
+  const [groundingMode, setGroundingMode] = useState<'none' | 'search' | 'maps'>('none');
+
   // Chat state
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedCitationMessageId, setExpandedCitationMessageId] = useState<string | null>(null);
+
+  // Live Voice State (gemini-3.1-flash-live-preview via WebSocket)
+  const [voiceStatus, setVoiceStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'speaking' | 'listening'>('disconnected');
+  const [isMicActive, setIsMicActive] = useState<boolean>(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceLog, setVoiceLog] = useState<Array<{ sender: 'user' | 'model'; text: string; time: string }>>([
+    { sender: 'model', text: 'Live Voice channel standby. Press "Activate Live Voice" to begin real-time audio conversation with gemini-3.1-flash-live-preview.', time: 'Ready' }
+  ]);
+  const voiceClientRef = useRef<LiveVoiceClient | null>(null);
+
+  // Google Maps Grounding Explorer State
+  const [mapsSearchQuery, setMapsSearchQuery] = useState<string>('Mandapam Marine Research Station & Rameswaram Coast Guard Base');
+  const [mapsLoading, setMapsLoading] = useState<boolean>(false);
+  const [mapsResponseText, setMapsResponseText] = useState<string>('');
+  const [mapsLinks, setMapsLinks] = useState<GroundingLink[]>([]);
   
   // Search & Knowledge Base state
   const [searchQuery, setSearchQuery] = useState('');
@@ -84,16 +148,18 @@ export const GhostVisionCopilotModal: React.FC<GhostVisionCopilotModalProps> = (
     {
       id: 'welcome-msg',
       sender: 'ai',
-      text: `### MarineSight AI Copilot // Real-Time RAG Assistant
-Welcome to the unified marine operational copilot. I am directly connected to the **MarineSight RAG Knowledge Engine**, retrieving live telemetry and technical documentation across:
-- **Marine Operations & Salvage SOPs**: Subsea ghost net extraction, hydraulic shears, pneumatic lift bags, and hazmat containment.
-- **System Usage Guides**: Step-by-step instructions for Sonar Studio, Surface Vision YOLOv9, Incident Command, and Drift Simulation.
-- **Side-Scan Sonar Physics**: Acoustic shadow trigonometry, slant-range unrolling, and Rayleigh speckle filtering.
-- **User-Provided Knowledge**: Custom vessel logs, field queries, and operational notes entered into your local index.
+      text: `### MarineSight AI Copilot // Real-Time Intelligence & RAG
+Welcome to the unified marine operational copilot. I am directly connected to the **Gemini 3.5 & 3.1 Neural Suite** with live grounding and the **MarineSight RAG Knowledge Engine**:
+- **Multi-Turn Chatbot**: Choose between \`gemini-3.5-flash\`, \`gemini-3.1-pro-preview\`, or \`gemini-3.1-flash-lite\`.
+- **Google Search Grounding**: Real-time web retrieval for live maritime news, ocean weather, and regulations.
+- **Google Maps Grounding**: Grounded geographic location discovery around the Gulf of Mannar & Palk Bay.
+- **Real-Time Voice Conversations**: Bidirectional live speech using \`gemini-3.1-flash-live-preview\` via WebSockets.
+- **Side-Scan Sonar Physics & Marine SOPs**: Acoustic shadow trigonometry, layback unrolling, and ghost net retrieval protocols.
 
-Ask any technical question below or switch tabs to explore the indexed documentation corpus in real-time.`,
+Select your preferred model or grounding mode above, ask any question below, or switch to the Live Voice tab for hands-free operational dispatch.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      source: 'RAG_GROUNDED_CORE',
+      source: 'GEMINI 3.5 FLASH + RAG GROUNDED',
+      modelUsed: 'gemini-3.5-flash',
       ragGrounded: true,
       retrievedDocsCount: RAG_KNOWLEDGE_BASE.length,
       citations: [
@@ -105,6 +171,16 @@ Ask any technical question below or switch tabs to explore the indexed documenta
   ]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Clean up Live Voice on unmount
+  useEffect(() => {
+    return () => {
+      if (voiceClientRef.current) {
+        voiceClientRef.current.disconnect();
+        voiceClientRef.current = null;
+      }
+    };
+  }, []);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -137,6 +213,65 @@ Ask any technical question below or switch tabs to explore the indexed documenta
     }
   }, [searchQuery, selectedCategory, userDocs, activeTab]);
 
+  // Handle Live Voice Toggle
+  const handleToggleLiveVoice = async () => {
+    if (isMicActive) {
+      voiceClientRef.current?.stopMicrophone();
+      setIsMicActive(false);
+      setVoiceLog(prev => [...prev, { sender: 'model', text: 'Microphone paused. Voice session maintained in standby.', time: new Date().toLocaleTimeString() }]);
+    } else {
+      setVoiceError(null);
+      if (!voiceClientRef.current) {
+        voiceClientRef.current = new LiveVoiceClient({
+          onStatusChange: (status) => {
+            setVoiceStatus(status);
+          },
+          onError: (err) => {
+            setVoiceError(err);
+            setVoiceStatus('disconnected');
+            setIsMicActive(false);
+          },
+          onInterrupted: () => {
+            setVoiceLog(prev => [...prev, { sender: 'user', text: '[User interrupted model audio]', time: new Date().toLocaleTimeString() }]);
+          },
+          onTurnComplete: () => {
+            setVoiceLog(prev => [...prev, { sender: 'model', text: '[Live audio response turn complete]', time: new Date().toLocaleTimeString() }]);
+          }
+        });
+      }
+
+      try {
+        await voiceClientRef.current.connect();
+        await voiceClientRef.current.startMicrophone();
+        setIsMicActive(true);
+        setVoiceLog(prev => [...prev, { sender: 'model', text: 'Live microphone streaming active. Speak into your microphone to talk to Gemini Live.', time: new Date().toLocaleTimeString() }]);
+      } catch (err: any) {
+        setVoiceError(err?.message || 'Could not start microphone');
+        setIsMicActive(false);
+      }
+    }
+  };
+
+  // Handle Google Maps Grounding Query
+  const handleQueryMaps = async (overrideQuery?: string) => {
+    const queryToUse = overrideQuery || mapsSearchQuery;
+    if (!queryToUse.trim() || mapsLoading) return;
+
+    setMapsLoading(true);
+    setMapsResponseText('');
+    setMapsLinks([]);
+
+    try {
+      const res = await apiService.queryMapsGrounding(queryToUse, 9.2550, 79.2350);
+      setMapsResponseText(res.text || 'Location inquiry complete.');
+      setMapsLinks(res.mapLinks || []);
+    } catch (err: any) {
+      setMapsResponseText('Failed to query Google Maps Grounding: ' + (err?.message || 'Network error'));
+    } finally {
+      setMapsLoading(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   // Pre-configured quick prompt pills grouped by topic
@@ -149,7 +284,7 @@ Ask any technical question below or switch tabs to explore the indexed documenta
     { label: 'Submerged Chemical Drums', query: 'What is the emergency containment protocol for corroded subsea chemical drums?' }
   ];
 
-  // Send message to Copilot with real-time RAG grounding
+  // Send message to Copilot with multi-turn history and optional Google Grounding
   const handleSend = async (promptText?: string) => {
     const textToSend = promptText || input;
     if (!textToSend.trim() || loading) return;
@@ -162,7 +297,8 @@ Ask any technical question below or switch tabs to explore the indexed documenta
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setMessages(prev => [...prev, userMsg]);
+    const updatedHistory = [...messages, userMsg];
+    setMessages(updatedHistory);
     if (!promptText) setInput('');
     setLoading(true);
 
@@ -178,35 +314,39 @@ Ask any technical question below or switch tabs to explore the indexed documenta
     };
 
     try {
-      // Step 1: Call full-stack API endpoint with userDocs included
-      const res = await fetch('/api/copilot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: textToSend,
-          prompt: textToSend,
-          context: runtimeContext,
-          userDocs: userDocs
-        })
+      const activeRole = COPILOT_ROLES.find(r => r.id === selectedRole) || COPILOT_ROLES[0];
+
+      // Call unified /api/chat endpoint with multi-turn conversation history
+      const res = await apiService.chatWithGemini({
+        messages: updatedHistory.map(m => ({
+          role: m.sender === 'ai' ? 'assistant' : 'user',
+          content: m.text
+        })),
+        prompt: textToSend,
+        model: selectedModel,
+        grounding: groundingMode,
+        systemInstruction: activeRole.systemInstruction,
+        location: { latitude: 9.2550, longitude: 79.2350 },
+        context: runtimeContext
       });
 
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
-      }
-
-      const data = await res.json();
-      const retrievedDocs = data.rag?.retrievedDocs || [];
+      const retrievedDocs = res.rag?.retrievedDocs || [];
+      const searchLinks = res.grounding?.searchLinks || [];
+      const mapLinks = res.grounding?.mapLinks || [];
 
       setMessages(prev => [
         ...prev,
         {
           id: `ai-${Date.now()}`,
           sender: 'ai',
-          text: data.reply || data.answer || "RAG analysis completed successfully.",
+          text: res.reply || res.text || "Operational analysis complete.",
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          source: data.source || 'GEMINI + RAG GROUNDING',
+          source: res.source || `${selectedModel.toUpperCase()} ${groundingMode !== 'none' ? `+ ${groundingMode.toUpperCase()} GROUNDING` : '+ RAG'}`,
+          modelUsed: res.modelUsed || selectedModel,
           ragGrounded: true,
           retrievedDocsCount: retrievedDocs.length,
+          searchLinks,
+          mapLinks,
           citations: retrievedDocs.map((d: any) => ({
             id: d.id,
             title: d.title,
@@ -219,8 +359,7 @@ Ask any technical question below or switch tabs to explore the indexed documenta
         }
       ]);
     } catch (e: any) {
-      console.warn('Falling back to local client-side RAG engine:', e);
-      // Client-side real-time RAG fallback using local searchRAGKnowledge + generateGroundedRAGAnswer
+      console.warn('Chat API error, using local RAG fallback:', e);
       const localResults = searchRAGKnowledge(textToSend, 'ALL', 4, userDocs);
       const groundedAnswer = generateGroundedRAGAnswer(textToSend, localResults, runtimeContext);
 
@@ -357,6 +496,35 @@ Ask any technical question below or switch tabs to explore the indexed documenta
             </button>
 
             <button
+              id="tab-btn-voice"
+              onClick={() => setActiveTab('voice')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium font-sans flex items-center gap-2 transition-all ${
+                activeTab === 'voice'
+                  ? 'bg-[#2DD4BF] text-black font-bold shadow-md shadow-[#2DD4BF]/20'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-white/5'
+              }`}
+            >
+              <Radio className={`w-4 h-4 ${isMicActive ? 'text-rose-400 animate-pulse' : ''}`} />
+              <span>Live Voice Channel</span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-red-950 text-red-300 border border-red-500/30">
+                LIVE API
+              </span>
+            </button>
+
+            <button
+              id="tab-btn-maps"
+              onClick={() => setActiveTab('maps')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium font-sans flex items-center gap-2 transition-all ${
+                activeTab === 'maps'
+                  ? 'bg-[#2DD4BF] text-black font-bold shadow-md shadow-[#2DD4BF]/20'
+                  : 'text-stone-400 hover:text-stone-200 hover:bg-white/5'
+              }`}
+            >
+              <MapPin className="w-4 h-4 text-emerald-400" />
+              <span>Maps Grounding</span>
+            </button>
+
+            <button
               id="tab-btn-search"
               onClick={() => setActiveTab('search')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-medium font-sans flex items-center gap-2 transition-all ${
@@ -366,7 +534,7 @@ Ask any technical question below or switch tabs to explore the indexed documenta
               }`}
             >
               <Search className="w-4 h-4" />
-              <span>Documentation Explorer</span>
+              <span>Docs Explorer</span>
               <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-black/30 text-white">
                 {totalCorpusCount}
               </span>
@@ -382,7 +550,7 @@ Ask any technical question below or switch tabs to explore the indexed documenta
               }`}
             >
               <PlusCircle className="w-4 h-4" />
-              <span>User Notes & Queries</span>
+              <span>User Notes</span>
               {userDocs.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-[#FFFF23] text-black font-bold">
                   {userDocs.length}
@@ -400,13 +568,13 @@ Ask any technical question below or switch tabs to explore the indexed documenta
               }`}
             >
               <BookOpen className="w-4 h-4" />
-              <span>System Usage Guides</span>
+              <span>Usage Guides</span>
             </button>
           </div>
 
           <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-stone-400">
             <span className="flex items-center gap-1 text-teal-400">
-              <Zap className="w-3.5 h-3.5 text-[#FFFF23]" /> Sub-second Retrieval
+              <Zap className="w-3.5 h-3.5 text-[#FFFF23]" /> Gemini 3.5 & 3.1 Suite
             </span>
           </div>
         </div>
@@ -415,6 +583,77 @@ Ask any technical question below or switch tabs to explore the indexed documenta
         {activeTab === 'chat' && (
           <div className="flex-1 flex flex-col min-h-0 bg-[#080C15]">
             
+            {/* Model & Grounding Config Bar */}
+            <div id="model-config-toolbar" className="px-4 py-2 bg-[#09111E] border-b border-white/10 flex flex-wrap items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Model Selector */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase">Model:</span>
+                  <select
+                    id="copilot-model-select"
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    className="bg-[#121B2B] text-teal-300 font-mono text-xs border border-white/15 rounded-md px-2 py-1 focus:outline-none focus:border-teal-400 cursor-pointer"
+                  >
+                    {GEMINI_MODELS.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.badge})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Role Persona Selector */}
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase">Role:</span>
+                  <select
+                    id="copilot-role-select"
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className="bg-[#121B2B] text-stone-200 font-mono text-xs border border-white/15 rounded-md px-2 py-1 focus:outline-none focus:border-teal-400 cursor-pointer"
+                  >
+                    {COPILOT_ROLES.map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Grounding Mode Toggle */}
+                <div className="flex items-center gap-1 text-xs pl-1">
+                  <span className="text-[10px] font-mono text-stone-400 uppercase">Grounding:</span>
+                  <div className="inline-flex rounded-lg bg-black/40 p-0.5 border border-white/10 text-[11px] font-mono">
+                    <button
+                      type="button"
+                      onClick={() => setGroundingMode('none')}
+                      className={`px-2 py-0.5 rounded ${groundingMode === 'none' ? 'bg-teal-500 text-black font-bold' : 'text-stone-400 hover:text-white'}`}
+                    >
+                      RAG Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroundingMode('search')}
+                      className={`px-2 py-0.5 rounded flex items-center gap-1 ${groundingMode === 'search' ? 'bg-teal-500 text-black font-bold' : 'text-stone-400 hover:text-white'}`}
+                    >
+                      <Globe className="w-3 h-3" /> Search
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroundingMode('maps')}
+                      className={`px-2 py-0.5 rounded flex items-center gap-1 ${groundingMode === 'maps' ? 'bg-teal-500 text-black font-bold' : 'text-stone-400 hover:text-white'}`}
+                    >
+                      <MapPin className="w-3 h-3" /> Maps
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[10px] font-mono text-stone-400 hidden lg:block">
+                Gulf of Mannar (9.2550°N, 79.2350°E)
+              </div>
+            </div>
+
             {/* Quick Query Suggestions Bar */}
             <div id="quick-prompts-bar" className="px-4 py-2 bg-[#0C121D] border-b border-white/10 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
               <span className="text-[11px] font-mono font-bold text-[#2DD4BF] shrink-0 uppercase tracking-wider flex items-center gap-1">
@@ -458,6 +697,54 @@ Ask any technical question below or switch tabs to explore the indexed documenta
                         {m.text}
                       </div>
 
+                      {/* Google Search Grounding Links */}
+                      {isAI && m.searchLinks && m.searchLinks.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-white/10">
+                          <span className="text-[11px] font-mono font-bold text-sky-400 flex items-center gap-1.5 mb-1.5">
+                            <Globe className="w-3.5 h-3.5" />
+                            GOOGLE SEARCH GROUNDING SOURCES ({m.searchLinks.length})
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.searchLinks.map((link, lIdx) => (
+                              <a
+                                key={lIdx}
+                                href={link.uri}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 rounded-md bg-sky-950/60 hover:bg-sky-900/80 border border-sky-500/30 text-[11px] font-mono text-sky-300 flex items-center gap-1.5 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3 text-sky-400" />
+                                <span className="font-medium truncate max-w-[220px]">{link.title || link.uri}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Google Maps Grounding Links */}
+                      {isAI && m.mapLinks && m.mapLinks.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-white/10">
+                          <span className="text-[11px] font-mono font-bold text-emerald-400 flex items-center gap-1.5 mb-1.5">
+                            <MapPin className="w-3.5 h-3.5" />
+                            GOOGLE MAPS GROUNDED PLACES ({m.mapLinks.length})
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.mapLinks.map((link, lIdx) => (
+                              <a
+                                key={lIdx}
+                                href={link.uri}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2.5 py-1 rounded-md bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/30 text-[11px] font-mono text-emerald-300 flex items-center gap-1.5 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3 text-emerald-400" />
+                                <span className="font-medium truncate max-w-[220px]">{link.title || 'View Place on Google Maps'}</span>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {/* RAG Citations & Grounding Sources Section */}
                       {isAI && m.citations && m.citations.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-white/10">
@@ -468,7 +755,7 @@ Ask any technical question below or switch tabs to explore the indexed documenta
                             </span>
                             <button
                               onClick={() => setExpandedCitationMessageId(isExpanded ? null : m.id)}
-                              className="text-[11px] font-mono text-stone-400 hover:text-stone-200 flex items-center gap-1"
+                              className="text-[11px] font-mono text-stone-400 hover:text-stone-200 flex items-center gap-1 cursor-pointer"
                             >
                               <span>{isExpanded ? 'Hide Passages' : 'Inspect Passages'}</span>
                               {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -480,7 +767,6 @@ Ask any technical question below or switch tabs to explore the indexed documenta
                               <button
                                 key={cIdx}
                                 onClick={() => {
-                                  // Look up full doc or create representation to open reader
                                   const fullDoc = RAG_KNOWLEDGE_BASE.find(d => d.id === c.id) || 
                                                   userDocs.find(d => d.id === c.id) || {
                                                     id: c.id,
@@ -561,7 +847,7 @@ Ask any technical question below or switch tabs to explore the indexed documenta
               {loading && (
                 <div className="flex items-center gap-3 text-xs font-mono text-[#2DD4BF] p-3.5 bg-[#101726]/80 rounded-2xl border border-teal-500/30 w-fit">
                   <Loader2 className="w-4 h-4 animate-spin text-[#FFFF23]" />
-                  <span>Retrieving technical documentation & formulating answer...</span>
+                  <span>Consulting {selectedModel} with operational context...</span>
                 </div>
               )}
 
@@ -593,10 +879,251 @@ Ask any technical question below or switch tabs to explore the indexed documenta
                   disabled={!input.trim() || loading}
                   className="px-5 py-3 rounded-xl bg-[#2DD4BF] hover:bg-[#26b4a2] disabled:opacity-40 text-black font-extrabold text-xs transition-colors shadow-lg shadow-[#2DD4BF]/20 flex items-center gap-2 shrink-0 cursor-pointer"
                 >
-                  <span>Query RAG</span>
+                  <span>Query AI</span>
                   <Send className="w-3.5 h-3.5" />
                 </button>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: LIVE VOICE CONVERSATIONS (gemini-3.1-flash-live-preview) */}
+        {activeTab === 'voice' && (
+          <div className="flex-1 flex flex-col min-h-0 bg-[#080C15] p-6 overflow-y-auto">
+            <div className="max-w-2xl mx-auto w-full space-y-6">
+              
+              {/* Header card */}
+              <div className="p-5 rounded-2xl bg-[#0F172A] border border-white/10 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-amber-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-rose-500/20">
+                  <Radio className="w-6 h-6 animate-pulse" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Live Operational Voice Dispatcher</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950 text-rose-300 border border-rose-500/30">
+                      gemini-3.1-flash-live-preview
+                    </span>
+                  </h3>
+                  <p className="text-xs text-stone-300 font-sans leading-relaxed">
+                    Direct low-latency bidirectional voice communication over WebSockets. Speak directly into your microphone for real-time salvage coordination, sonar acoustic calculations, and incident triage in the Gulf of Mannar.
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Audio Visualizer Stage */}
+              <div className="p-8 rounded-2xl bg-[#090D16] border border-teal-500/30 flex flex-col items-center justify-center text-center space-y-6">
+                
+                {/* Voice Status Pill */}
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    voiceStatus === 'speaking' ? 'bg-amber-400 animate-ping' :
+                    voiceStatus === 'listening' ? 'bg-rose-500 animate-pulse' :
+                    voiceStatus === 'connected' ? 'bg-teal-400' :
+                    voiceStatus === 'connecting' ? 'bg-yellow-400 animate-spin' :
+                    'bg-stone-500'
+                  }`} />
+                  <span className="text-xs font-mono font-bold tracking-wider uppercase text-teal-300">
+                    STATUS: {voiceStatus.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Animated Waveform Bars */}
+                <div className="flex items-center justify-center gap-1.5 h-16 w-full max-w-xs">
+                  {[40, 75, 25, 90, 50, 80, 30, 65, 95, 45, 70, 35].map((h, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 rounded-full transition-all duration-150 ${
+                        isMicActive || voiceStatus === 'speaking'
+                          ? 'bg-gradient-to-t from-teal-400 to-rose-400 animate-pulse'
+                          : 'bg-stone-800'
+                      }`}
+                      style={{
+                        height: isMicActive || voiceStatus === 'speaking'
+                          ? `${Math.max(15, (h * (voiceStatus === 'speaking' ? 1.0 : 0.6)))}%`
+                          : '15%'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Voice Action Button */}
+                <div className="flex flex-col items-center gap-3">
+                  <button
+                    id="live-voice-toggle-btn"
+                    onClick={handleToggleLiveVoice}
+                    className={`px-8 py-4 rounded-2xl font-bold text-sm flex items-center gap-3 transition-all shadow-xl cursor-pointer ${
+                      isMicActive
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/30'
+                        : 'bg-[#2DD4BF] hover:bg-[#25b5a3] text-black shadow-[#2DD4BF]/25'
+                    }`}
+                  >
+                    {isMicActive ? (
+                      <>
+                        <MicOff className="w-5 h-5" />
+                        <span>Mute / Disconnect Microphone</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-5 h-5" />
+                        <span>Activate Live Voice Channel</span>
+                      </>
+                    )}
+                  </button>
+
+                  <span className="text-[11px] font-mono text-stone-400">
+                    {isMicActive ? 'Transmitting 16 kHz PCM audio bidirectional stream' : 'Microphone currently idle. Click to start.'}
+                  </span>
+                </div>
+
+                {voiceError && (
+                  <div className="p-3 rounded-xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs font-mono">
+                    {voiceError}
+                  </div>
+                )}
+              </div>
+
+              {/* Voice Channel Event Transcript */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono text-stone-400">
+                  <span>SESSION LOG & DISPATCH TRANSCRIPT</span>
+                  <span>Audio Out: 24 kHz PCM</span>
+                </div>
+                <div className="p-4 rounded-xl bg-[#090E17] border border-white/10 space-y-2 max-h-48 overflow-y-auto">
+                  {voiceLog.map((log, lIdx) => (
+                    <div key={lIdx} className="text-xs font-mono flex items-start gap-2">
+                      <span className="text-stone-500 text-[10px] shrink-0 mt-0.5">[{log.time}]</span>
+                      <span className={log.sender === 'user' ? 'text-amber-300 font-semibold' : 'text-teal-300'}>
+                        {log.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: GOOGLE MAPS GROUNDING EXPLORER */}
+        {activeTab === 'maps' && (
+          <div className="flex-1 flex flex-col min-h-0 bg-[#080C15] p-6 overflow-y-auto">
+            <div className="max-w-3xl mx-auto w-full space-y-6">
+              
+              {/* Header card */}
+              <div className="p-5 rounded-2xl bg-[#0F172A] border border-white/10 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20">
+                  <MapPin className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Google Maps Grounding Engine</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                      gemini-3.5-flash + googleMaps
+                    </span>
+                  </h3>
+                  <p className="text-xs text-stone-300 font-sans leading-relaxed">
+                    Ground maritime and shoreline queries directly against real-world Google Maps place entities, coordinates, harbors, and marine reserves near Gulf of Mannar (9.2550°N, 79.2350°E).
+                  </p>
+                </div>
+              </div>
+
+              {/* Search Bar & Quick Chips */}
+              <div className="space-y-3">
+                <form
+                  onSubmit={(e) => { e.preventDefault(); handleQueryMaps(); }}
+                  className="flex items-center gap-2"
+                >
+                  <div className="relative flex-1">
+                    <MapPin className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      id="maps-grounding-query-input"
+                      type="text"
+                      value={mapsSearchQuery}
+                      onChange={(e) => setMapsSearchQuery(e.target.value)}
+                      placeholder="Search marine stations, ports, salvage docks, or coral reefs..."
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0E1524] border border-white/15 focus:border-emerald-400 focus:outline-none text-xs text-white placeholder:text-stone-500 font-sans"
+                    />
+                  </div>
+                  <button
+                    id="maps-grounding-query-btn"
+                    type="submit"
+                    disabled={mapsLoading || !mapsSearchQuery.trim()}
+                    className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-black font-extrabold text-xs transition-colors flex items-center gap-2 shrink-0 cursor-pointer shadow-lg shadow-emerald-500/20"
+                  >
+                    {mapsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    <span>Query Maps</span>
+                  </button>
+                </form>
+
+                {/* Preset Chips */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-mono text-stone-400">Quick Presets:</span>
+                  {[
+                    'Mandapam Marine Station & Coral Labs',
+                    'Rameswaram Fishing Harbor & Boat Slipways',
+                    'Gulf of Mannar Marine National Park Headquarters',
+                    'Dhanushkodi Coast Guard Outpost & Emergency Berths'
+                  ].map((preset, pIdx) => (
+                    <button
+                      key={pIdx}
+                      type="button"
+                      onClick={() => { setMapsSearchQuery(preset); handleQueryMaps(preset); }}
+                      className="text-xs font-mono px-3 py-1 rounded-lg bg-white/5 hover:bg-emerald-950 hover:text-emerald-300 text-stone-300 border border-white/10 transition-colors cursor-pointer"
+                    >
+                      {preset.split('&')[0].trim()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Results Display */}
+              {mapsLoading && (
+                <div className="p-8 rounded-2xl bg-[#090E17] border border-emerald-500/30 flex items-center justify-center gap-3 text-xs font-mono text-emerald-300">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Grounding against Google Maps Platform database...</span>
+                </div>
+              )}
+
+              {mapsResponseText && (
+                <div className="space-y-4">
+                  <div className="p-5 rounded-2xl bg-[#0B1322] border border-white/10 space-y-3">
+                    <span className="text-xs font-mono font-bold text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      GROUNDED GEOGRAPHIC ANALYSIS
+                    </span>
+                    <div className="text-xs sm:text-[13px] text-stone-200 font-sans leading-relaxed whitespace-pre-wrap">
+                      {mapsResponseText}
+                    </div>
+                  </div>
+
+                  {/* Maps Links */}
+                  {mapsLinks.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-xs font-mono font-bold text-emerald-400 uppercase">
+                        VERIFIED GOOGLE MAPS PLACE ENTITIES ({mapsLinks.length})
+                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {mapsLinks.map((link, lIdx) => (
+                          <a
+                            key={lIdx}
+                            href={link.uri}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-3 rounded-xl bg-[#0F172A] hover:bg-emerald-950/40 border border-white/10 hover:border-emerald-500/40 text-xs font-sans text-stone-200 flex items-center justify-between gap-2 transition-all"
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
+                              <span className="font-semibold truncate">{link.title || 'View on Google Maps'}</span>
+                            </div>
+                            <ExternalLink className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         )}

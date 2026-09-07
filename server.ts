@@ -1,7 +1,9 @@
 import express from 'express';
+import http from 'http';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { WebSocketServer, WebSocket } from 'ws';
 import { 
   RAG_KNOWLEDGE_BASE, 
   searchRAGKnowledge, 
@@ -11,6 +13,7 @@ import {
 
 const app = express();
 const PORT = 3000;
+const server = http.createServer(app);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -31,16 +34,28 @@ function getGenAI(): GoogleGenAI | null {
   return genAIClient;
 }
 
-// Resilient Gemini generateContent with automatic retry and model fallback (gemini-3.8-flash -> gemini-flash-latest)
+// Resilient Gemini generateContent with automatic retry and model fallback
 async function generateWithGemini(params: {
   contents: any;
   systemInstruction?: string;
   responseMimeType?: string;
-}): Promise<{ text: string | null; modelUsed: string | null }> {
+  model?: string;
+  tools?: any[];
+  toolConfig?: any;
+  timeoutMs?: number;
+}): Promise<{ text: string | null; modelUsed: string | null; rawResponse?: any }> {
   const ai = getGenAI();
   if (!ai) return { text: null, modelUsed: null };
 
-  const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest'];
+  const preferredModel = params.model || 'gemini-3.5-flash';
+  const candidateModels = [
+    preferredModel,
+    'gemini-3.5-flash',
+    'gemini-3.8-flash',
+    'gemini-flash-latest'
+  ].filter((v, idx, arr) => arr.indexOf(v) === idx);
+
+  const timeoutMs = params.timeoutMs || 25000;
 
   for (const model of candidateModels) {
     try {
@@ -51,8 +66,13 @@ async function generateWithGemini(params: {
       if (params.responseMimeType) {
         config.responseMimeType = params.responseMimeType;
       }
+      if (params.tools) {
+        config.tools = params.tools;
+      }
+      if (params.toolConfig) {
+        config.toolConfig = params.toolConfig;
+      }
 
-      const timeoutMs = 4000;
       const responsePromise = ai.models.generateContent({
         model,
         contents: params.contents,
@@ -65,8 +85,9 @@ async function generateWithGemini(params: {
 
       const response = (await Promise.race([responsePromise, timeoutPromise])) as any;
 
-      if (response && response.text) {
-        return { text: response.text, modelUsed: model };
+      const reply = response?.text || response?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (reply) {
+        return { text: reply, modelUsed: model, rawResponse: response };
       }
     } catch (err: any) {
       const statusCode = err?.status || err?.code || err?.error?.code;
@@ -268,39 +289,48 @@ app.post('/api/detection/surface', async (req, res) => {
           const mimeType = matches[1] || 'image/jpeg';
           const base64Data = matches[2];
 
-          const prompt = `You are a real-time YOLOv9 Marine Computer Vision model running on an oceanic surveillance drone.
-Perform object-level detection and classification on this maritime image. Do NOT report a generic "debris detected".
-Identify WHAT each object is specifically.
-Possible specific classes: "Plastic Bag", "Plastic Bottle", "Fishing Net", "Synthetic Rope", "Plastic Container", "Metal Can", "Styrofoam Float", "Buoy", "Derelict Wire Trap", "Oil Slick". If an object cannot be classified specifically, identify it as "Marine Debris Anomaly".
+          const prompt = `You are a high-accuracy marine computer vision intelligence model on an oceanic drone.
+Carefully inspect this uploaded maritime/aquatic image. Identify and locate the ACTUAL physical objects, debris, plastics, gear, floats, containers, slicks, wildlife, or vessels visible in this image.
+Do NOT output placeholder or hardcoded boxes. Look at the real content of this picture.
 
-Return ONLY a JSON object in this exact schema without markdown code blocks:
+Return ONLY a JSON object (no markdown, no backticks):
 {
   "detected": true,
-  "category": "Plastic" | "Ghost Fishing Gear" | "Styrofoam" | "Oil Slick" | "Derelict Trap" | "Buoy",
-  "confidence": 0.94,
+  "category": "Plastic" | "Ghost Fishing Gear" | "Styrofoam" | "Oil Slick" | "Derelict Trap" | "Metal" | "General Debris",
+  "confidence": 0.95,
   "severity": "CRITICAL" | "HIGH" | "MODERATE" | "LOW",
-  "estimatedWeightKg": 185,
-  "estimatedDimensions": "12.0m x 4.5m",
-  "opticalSignature": "Spectral signature description",
-  "aiExplanation": "Detailed scientific reason for detection and boundary localization",
+  "estimatedWeightKg": 140,
+  "estimatedDimensions": "3.5m x 1.8m",
+  "opticalSignature": "Detailed description of visible spectral reflectance, textures, colors, and buoyant shape",
+  "aiExplanation": "Comprehensive technical rationale describing each detected item and its exact location",
   "boundingBoxes": [
     {
       "class_id": 1,
-      "class_name": "plastic_bag",
-      "display_name": "Plastic Bag",
-      "x": 120,
-      "y": 85,
-      "width": 190,
-      "height": 185,
-      "label": "Plastic Bag — 91%",
-      "confidence": 0.91,
-      "category": "Plastic"
+      "class_name": "plastic_bottle",
+      "display_name": "Plastic Bottle",
+      "x": 140,
+      "y": 90,
+      "width": 180,
+      "height": 160,
+      "confidence": 0.94,
+      "category": "Plastic",
+      "severity": "HIGH",
+      "whyClassified": "Visible translucent polymer cylinder with specular surface reflection"
     }
   ]
 }
-Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y: 0-400, width: 20-500, height: 20-350).`;
+
+COORDINATE RULES:
+- The coordinate canvas is exactly 600 wide and 400 high.
+- x is the left edge (between 0 and 560).
+- y is the top edge (between 0 and 360).
+- width is the pixel width (between 25 and 580).
+- height is the pixel height (between 25 and 380).
+- Ensure each bounding box tightly encloses the corresponding visual object in the image.
+- List all distinct objects visible in the image.`;
 
           const { text: geminiRaw } = await generateWithGemini({
+            model: 'gemini-3.5-flash',
             contents: [
               {
                 role: 'user',
@@ -310,30 +340,37 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
                 ]
               }
             ],
-            responseMimeType: 'application/json'
+            responseMimeType: 'application/json',
+            timeoutMs: 30000
           });
 
           const rawText = geminiRaw || '';
-          const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+          let cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const firstBrace = cleanedText.indexOf('{');
+          const lastBrace = cleanedText.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace !== -1) {
+            cleanedText = cleanedText.substring(firstBrace, lastBrace + 1);
+          }
+
           const parsed = JSON.parse(cleanedText);
 
           if (parsed && (parsed.category || Array.isArray(parsed.boundingBoxes))) {
             primaryCategory = parsed.category || primaryCategory;
-            primaryConfidence = parsed.confidence || 0.94;
+            primaryConfidence = parsed.confidence || 0.95;
             primarySeverity = parsed.severity || 'HIGH';
-            estimatedWeightKg = parsed.estimatedWeightKg || 185;
-            estimatedDimensions = parsed.estimatedDimensions || '12.0m x 4.5m';
+            estimatedWeightKg = parsed.estimatedWeightKg || 120;
+            estimatedDimensions = parsed.estimatedDimensions || '4.0m x 2.2m';
             opticalSignature = parsed.opticalSignature || opticalSignature;
             aiExplanation = parsed.aiExplanation || aiExplanation;
             if (Array.isArray(parsed.boundingBoxes) && parsed.boundingBoxes.length > 0) {
               detectedObjects = parsed.boundingBoxes.map((b: any, idx: number) => {
-                const bx = Math.max(0, Math.min(580, Math.round(b.x || 100)));
-                const by = Math.max(0, Math.min(380, Math.round(b.y || 80)));
-                const bw = Math.max(30, Math.min(500, Math.round(b.width || 180)));
-                const bh = Math.max(30, Math.min(350, Math.round(b.height || 140)));
+                const bx = Math.max(0, Math.min(570, Math.round(b.x || (60 + idx * 80))));
+                const by = Math.max(0, Math.min(370, Math.round(b.y || (50 + idx * 60))));
+                const bw = Math.max(30, Math.min(600 - bx, Math.round(b.width || 160)));
+                const bh = Math.max(30, Math.min(400 - by, Math.round(b.height || 140)));
                 const conf = Number((b.confidence || primaryConfidence).toFixed(2));
                 const dName = b.display_name || b.category || primaryCategory;
-                const cName = b.class_name || dName.toLowerCase().replace(/ /g, '_');
+                const cName = b.class_name || dName.toLowerCase().replace(/[\s-]+/g, '_');
 
                 return {
                   id: `DET-SURF-${Date.now()}-${idx + 1}`,
@@ -353,15 +390,15 @@ Ensure bounding boxes are normalized to a 600x400 coordinate canvas (x: 0-600, y
                   height: bh,
                   label: `${dName} — ${Math.round(conf * 100)}%`,
                   category: b.category || primaryCategory,
-                  severity: primarySeverity,
-                  whyClassified: b.whyClassified || `Neural feature extractor identified distinct ${dName} optical signature.`
+                  severity: b.severity || primarySeverity,
+                  whyClassified: b.whyClassified || `Neural feature extractor localized ${dName} optical signature in marine surface frame.`
                 };
               });
             }
           }
         }
       } catch (geminiVisionErr) {
-        console.warn('Gemini Vision direct parsing notice (using neural fallback):', geminiVisionErr);
+        console.warn('Gemini Vision direct parsing notice:', geminiVisionErr);
       }
     }
 
@@ -772,6 +809,234 @@ const handleCopilotRequest = async (req: express.Request, res: express.Response)
 
 app.post('/api/ai/copilot', handleCopilotRequest);
 app.post('/api/copilot', handleCopilotRequest);
+
+// 7B. Multi-Turn Gemini Chatbot API with Model Selection, Roles, Search & Maps Grounding
+app.post('/api/chat', async (req, res) => {
+  try {
+    const {
+      messages = [],
+      prompt,
+      model = 'gemini-3.5-flash',
+      systemInstruction = 'You are MarineSight AI Copilot, a senior marine salvage and oceanographic operations intelligence assistant specialized in the Gulf of Mannar and Palk Bay. You provide technically rigorous, actionable guidance on sonar acoustic interpretation, ghost net salvage procedures, environmental compliance, and autonomous fleet coordination.',
+      grounding = 'none', // 'none' | 'search' | 'maps'
+      location = { latitude: 9.2550, longitude: 79.2350 },
+      context = {}
+    } = req.body;
+
+    const lastMessage = prompt || (messages.length > 0 ? messages[messages.length - 1].content : '');
+    if (!lastMessage) {
+      return res.status(400).json({ error: 'Message or prompt is required' });
+    }
+
+    // Build multi-turn conversation contents
+    const contents: any[] = [];
+    if (Array.isArray(messages) && messages.length > 0) {
+      for (const msg of messages) {
+        if (msg.content && msg.content.trim()) {
+          contents.push({
+            role: (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          });
+        }
+      }
+    } else {
+      contents.push({
+        role: 'user',
+        parts: [{ text: lastMessage }]
+      });
+    }
+
+    // Configure tools and model
+    let tools: any[] | undefined = undefined;
+    let toolConfig: any | undefined = undefined;
+    let effectiveModel = model;
+
+    if (grounding === 'maps') {
+      // Maps Grounding requires gemini-3.5-flash
+      effectiveModel = 'gemini-3.5-flash';
+      tools = [{ googleMaps: {} }];
+      toolConfig = {
+        retrievalConfig: {
+          latLng: {
+            latitude: Number(location.latitude) || 9.2550,
+            longitude: Number(location.longitude) || 79.2350,
+          }
+        }
+      };
+    } else if (grounding === 'search') {
+      // Search Grounding requires gemini-3.5-flash
+      effectiveModel = 'gemini-3.5-flash';
+      tools = [{ googleSearch: {} }];
+    }
+
+    const genResult = await generateWithGemini({
+      model: effectiveModel,
+      contents,
+      systemInstruction,
+      tools,
+      toolConfig,
+      timeoutMs: 30000
+    });
+
+    const replyText = genResult.text;
+    const rawResponse = genResult.rawResponse;
+
+    // Extract verified grounding sources
+    const searchLinks: Array<{ title: string; uri: string }> = [];
+    const mapLinks: Array<{ title: string; uri: string }> = [];
+
+    if (rawResponse) {
+      const chunks = rawResponse.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      chunks.forEach((chunk: any) => {
+        if (chunk.web?.uri) {
+          searchLinks.push({
+            title: chunk.web.title || chunk.web.uri,
+            uri: chunk.web.uri
+          });
+        }
+        if (chunk.maps?.uri) {
+          mapLinks.push({
+            title: chunk.maps.title || 'View Location on Google Maps',
+            uri: chunk.maps.uri
+          });
+        }
+        if (chunk.maps?.placeAnswerSources?.reviewSnippets) {
+          chunk.maps.placeAnswerSources.reviewSnippets.forEach((snippet: any) => {
+            if (snippet.uri && !mapLinks.some(l => l.uri === snippet.uri)) {
+              mapLinks.push({
+                title: snippet.title || chunk.maps?.title || 'Google Maps Place Snippet',
+                uri: snippet.uri
+              });
+            }
+          });
+        }
+      });
+    }
+
+    if (replyText) {
+      return res.json({
+        success: true,
+        reply: replyText.trim(),
+        answer: replyText.trim(),
+        modelUsed: genResult.modelUsed || effectiveModel,
+        grounding: {
+          mode: grounding,
+          searchLinks,
+          mapLinks,
+          grounded: searchLinks.length > 0 || mapLinks.length > 0
+        }
+      });
+    }
+
+    // Deterministic fallback response when Gemini key is offline
+    const fallbackText = getCopilotFallbackReply(lastMessage, context);
+    return res.json({
+      success: true,
+      reply: fallbackText,
+      answer: fallbackText,
+      modelUsed: 'marine-deterministic-engine',
+      grounding: {
+        mode: grounding,
+        searchLinks: grounding === 'search' ? [
+          { title: 'Gulf of Mannar Biosphere Reserve Authority', uri: 'https://forests.tn.gov.in/pages/view/gulf-of-mannar-biosphere-reserve' },
+          { title: 'NOAA Ocean Cleanup & Ghost Gear Initiative', uri: 'https://marinedebris.noaa.gov/' },
+          { title: 'ICAR - Central Marine Fisheries Research Institute', uri: 'https://www.cmfri.org.in/' }
+        ] : [],
+        mapLinks: grounding === 'maps' ? [
+          { title: 'Mandapam Regional Centre (ICAR-CMFRI)', uri: 'https://maps.google.com/?q=Mandapam+Regional+Centre+CMFRI' },
+          { title: 'Gulf of Mannar Marine National Park', uri: 'https://maps.google.com/?q=Gulf+of+Mannar+Marine+National+Park' },
+          { title: 'Dhanushkodi Ocean Boundary & Coral Reefs', uri: 'https://maps.google.com/?q=Dhanushkodi+Tamil+Nadu' }
+        ] : [],
+        grounded: false
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 7C. Google Maps Grounding dedicated endpoint for places and marine locations
+app.post('/api/gemini/maps', async (req, res) => {
+  try {
+    const { 
+      query, 
+      latitude = 9.2550, 
+      longitude = 79.2350 
+    } = req.body;
+
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+
+    const prompt = `You are a coastal navigation and marine geographic intelligence advisor. 
+Help the user identify real ports, marine stations, marine national parks, recovery facilities, or coastal landmarks near coordinates ${latitude}°N, ${longitude}°E based on the user's request:
+"${query}"
+
+Provide specific place details including names, distances, operational roles, and accessibility.`;
+
+    const genResult = await generateWithGemini({
+      model: 'gemini-3.5-flash',
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      tools: [{ googleMaps: {} }],
+      toolConfig: {
+        retrievalConfig: {
+          latLng: {
+            latitude: Number(latitude),
+            longitude: Number(longitude),
+          }
+        }
+      },
+      timeoutMs: 25000
+    });
+
+    const mapLinks: Array<{ title: string; uri: string }> = [];
+    const rawResponse = genResult.rawResponse;
+
+    if (rawResponse) {
+      const chunks = rawResponse.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      chunks.forEach((chunk: any) => {
+        if (chunk.maps?.uri) {
+          mapLinks.push({
+            title: chunk.maps.title || 'View Place on Google Maps',
+            uri: chunk.maps.uri
+          });
+        }
+        if (chunk.maps?.placeAnswerSources?.reviewSnippets) {
+          chunk.maps.placeAnswerSources.reviewSnippets.forEach((snippet: any) => {
+            if (snippet.uri && !mapLinks.some(l => l.uri === snippet.uri)) {
+              mapLinks.push({
+                title: snippet.title || chunk.maps?.title || 'Place Details & Reviews',
+                uri: snippet.uri
+              });
+            }
+          });
+        }
+      });
+    }
+
+    if (genResult.text) {
+      return res.json({
+        success: true,
+        answer: genResult.text,
+        mapLinks,
+        modelUsed: genResult.modelUsed
+      });
+    }
+
+    return res.json({
+      success: true,
+      answer: `Near Gulf of Mannar (${latitude}°N, ${longitude}°E), key operational points include:\n• **Mandapam Marine Station (ICAR-CMFRI)**: Primary hydrographic and biological monitoring station.\n• **Gulf of Mannar Marine National Park**: Strict ecological reserve spanning 21 islands.\n• **Rameswaram Fishing Harbor**: Major salvage vessel staging and debris offload pier.`,
+      mapLinks: [
+        { title: 'Mandapam Marine Station (ICAR-CMFRI)', uri: 'https://maps.google.com/?q=Mandapam+Regional+Centre+CMFRI' },
+        { title: 'Gulf of Mannar Marine National Park', uri: 'https://maps.google.com/?q=Gulf+of+Mannar+Marine+National+Park' },
+        { title: 'Rameswaram Fishing Harbor', uri: 'https://maps.google.com/?q=Rameswaram+Port' }
+      ],
+      modelUsed: 'marine-deterministic-maps'
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 // RAG Knowledge Base Exploration Endpoints
 app.get('/api/copilot/rag/corpus', (req, res) => {
@@ -2276,6 +2541,98 @@ app.post('/api/sonar/georeference', async (req, res) => {
 
 
 // ----------------------------------------------------
+// LIVE VOICE CONVERSATIONS (gemini-3.1-flash-live-preview WebSocket)
+// ----------------------------------------------------
+const wss = new WebSocketServer({ server, path: '/api/live-voice' });
+
+wss.on('connection', async (clientWs: WebSocket) => {
+  console.log('[Live Voice] Client connected to live-voice channel');
+  const ai = getGenAI();
+
+  if (!ai) {
+    clientWs.send(JSON.stringify({ 
+      type: 'error', 
+      message: 'Gemini API client not initialized. Ensure GEMINI_API_KEY environment variable is configured.' 
+    }));
+    return;
+  }
+
+  let session: any = null;
+
+  try {
+    session = await ai.live.connect({
+      model: 'gemini-3.1-flash-live-preview',
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
+        },
+        systemInstruction: 'You are the MarineSight AI Live Operational Dispatcher. You assist vessel captains, drone operators, and salvage divers in the Gulf of Mannar and Palk Bay with rapid maritime advice. Keep spoken responses concise, highly operational, direct, and under 3 sentences unless asked for deeper technical breakdowns.',
+      },
+      callbacks: {
+        onmessage: (message: LiveServerMessage) => {
+          const audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+          if (audio && clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({ type: 'audio', audio }));
+          }
+          if (message.serverContent?.interrupted && clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({ type: 'interrupted' }));
+          }
+          if (message.serverContent?.turnComplete && clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({ type: 'turnComplete' }));
+          }
+        },
+        onclose: () => {
+          console.log('[Live Voice] Gemini Live session closed');
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(JSON.stringify({ type: 'session_closed' }));
+          }
+        }
+      },
+    });
+
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(JSON.stringify({ 
+        type: 'connected', 
+        message: 'Connected to gemini-3.1-flash-live-preview Voice Channel' 
+      }));
+    }
+
+    clientWs.on('message', (data: any) => {
+      try {
+        const parsed = JSON.parse(data.toString());
+        if (parsed.audio && session) {
+          session.sendRealtimeInput({
+            audio: { data: parsed.audio, mimeType: 'audio/pcm;rate=16000' },
+          });
+        } else if (parsed.text && session) {
+          session.sendRealtimeInput({
+            text: parsed.text,
+          });
+        }
+      } catch (err) {
+        console.error('[Live Voice] Packet error:', err);
+      }
+    });
+
+    clientWs.on('close', () => {
+      console.log('[Live Voice] Client disconnected');
+      if (session) {
+        try { session.close(); } catch {}
+      }
+    });
+  } catch (err: any) {
+    console.error('[Live Voice] Connection error:', err);
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(JSON.stringify({ 
+        type: 'error', 
+        message: err?.message || 'Failed to start Live API session' 
+      }));
+    }
+  }
+});
+
+// ----------------------------------------------------
 // VITE / STATIC SERVING
 // ----------------------------------------------------
 async function startServer() {
@@ -2293,8 +2650,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`GhostVision Server running on http://0.0.0.0:${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`MarineSight AI Server running on http://0.0.0.0:${PORT}`);
   });
 }
 

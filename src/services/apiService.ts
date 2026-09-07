@@ -96,6 +96,36 @@ export const apiService = {
     return await res.json();
   },
 
+  // Gemini Multi-Turn Chat with Grounding (gemini-3.5-flash, gemini-3.1-pro-preview, gemini-3.1-flash-lite)
+  chatWithGemini: async (payload: {
+    messages?: Array<{ role: 'user' | 'assistant' | 'model'; content: string }>;
+    prompt?: string;
+    model?: string;
+    systemInstruction?: string;
+    grounding?: 'none' | 'search' | 'maps';
+    location?: { latitude: number; longitude: number };
+    context?: any;
+  }) => {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Gemini Chat API error: ${res.statusText}`);
+    return await res.json();
+  },
+
+  // Gemini Maps Grounding for Places & Marine Stations
+  queryMapsGrounding: async (query: string, latitude = 9.2550, longitude = 79.2350) => {
+    const res = await fetch('/api/gemini/maps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, latitude, longitude }),
+    });
+    if (!res.ok) throw new Error(`Maps Grounding API error: ${res.statusText}`);
+    return await res.json();
+  },
+
   // Detection Explanation
   explainDetection: async (payload: {
     category: string;
